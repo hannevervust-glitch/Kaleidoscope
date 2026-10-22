@@ -190,11 +190,11 @@
     const DEFAULTS = {
         surprise: 0.35, intensity: 1, bloom: 1, bassSens: 1, percSens: 1, rotation: 0.6,
         distortion: 0.3, smooth: 0.6, trails: 0.25, symmetry: true,
-        size: 1, mirrors: 12, palette: 'Neon', shapes: [true, true, true, true], rings: true, depth: false, seed: 1
+        size: 1, mirrors: 12, palette: 'Neon', shapes: [true, false, true, true], rings: true, depth: false, seed: 1
     };
     let S = { ...DEFAULTS };
-    try { const v = JSON.parse(localStorage.getItem('kaleido-music-v3') || 'null'); if (v && typeof v === 'object') S = { ...DEFAULTS, ...v }; } catch (e) {}
-    const save = () => { try { localStorage.setItem('kaleido-music-v3', JSON.stringify(S)); } catch (e) {} };
+    try { const v = JSON.parse(localStorage.getItem('kaleido-music-v4') || 'null'); if (v && typeof v === 'object') S = { ...DEFAULTS, ...v }; } catch (e) {}
+    const save = () => { try { localStorage.setItem('kaleido-music-v4', JSON.stringify(S)); } catch (e) {} };
 
     const PALETTES = {
         'Neon': ['#FF1493','#FF69B4','#FF6347','#FFD700','#FFA500','#00CED1','#32CD32','#9370DB','#DC143C','#FF4500','#00FF7F','#1E90FF','#8A2BE2','#00FA9A','#FF8C00','#DA70D6','#40E0D0'],
@@ -385,24 +385,26 @@
         return [x, v];
     }
 
-    // Blooms: each shape grows from nothing, travels outward, and fades
+    // Patterns work like the original: each lives inside one mirrored segment, slowly grows with age
+    // and overlaps its neighbours, so the mirrors turn them into full, merged shapes.
     const blooms = [];
-    function enabledShapes() { const s = []; S.shapes.forEach((on, i) => on && s.push(i)); return s.length ? s : [0, 1, 2, 3]; }
+    function enabledShapes() { const s = []; S.shapes.forEach((on, i) => on && s.push(i)); return s.length ? s : [0, 2, 3]; }
     function addBloom(opts) {
         const shapes = enabledShapes();
-        blooms.push(Object.assign({
-            u: 0.1 + Math.pow(rnd(), 1.4) * 0.8,    // radial position in the slice (0 centre, 1 rim); denser towards the inside
-            v: (rnd() - 0.5) * 0.9,                 // across the slice
-            size: 0.5 + Math.pow(rnd(), 2) * 1.8,   // mostly small jewels, a few larger ones
-            shape: shapes[Math.floor(rnd() * shapes.length)],
+        const o = opts || {};
+        blooms.push({
+            nx: rnd(), ny: rnd(),                              // position in the segment, 0..1
+            size: o.size != null ? o.size * 3 : 1 + rnd() * 3, // original sizes: small to start, bursts bigger
+            shape: o.shape != null && S.shapes[o.shape] ? o.shape : shapes[Math.floor(rnd() * shapes.length)],
             ci: Math.floor(rnd() * 64),
-            rot: rnd() * Math.PI * 2,
-            spin: (rnd() - 0.5) * 0.6,
-            depth: 0.5 + rnd(),                     // how fast it drifts outward
-            salt: rnd() * 100,
-            born: M.t, grow: 1.6 + rnd() * 1.6,     // seconds to fully bloom
-            life: 14 + rnd() * 16, fade: 2.5
-        }, opts || {}));
+            rot: rnd() * Math.PI * 2, racc: 0, acc: 0,
+            sp: 0.005 + rnd() * 0.012,
+            phase: rnd() * Math.PI * 2,
+            pulseRate: 0.01 + rnd() * 0.02,
+            mi: o.mi != null ? o.mi : 0.25 + rnd() * 0.5,
+            born: o.born != null ? o.born : M.t, grow: o.grow || 1.8 + rnd() * 1.6,
+            life: o.life || 22 + rnd() * 26, fade: o.fade || 3
+        });
     }
 
     function updateMotion(dt) {
@@ -422,7 +424,7 @@
             M.dropBloom = Math.min(1.4, M.dropBloom + (0.15 + 0.55 * F.dropEvent) * S.bloom);
             M.palShift += 3 + Math.floor(rnd() * 4);
             const n = Math.round(16 + 20 * F.dropEvent);
-            for (let i = 0; i < n; i++) addBloom({ u: 0.04 + rnd() * 0.25, size: 1 + rnd() * 1.4 * (0.6 + F.dropEvent), grow: 2.4 + rnd() * 2, life: 10 + rnd() * 10 });
+            for (let i = 0; i < n; i++) addBloom({ size: 0.8 + rnd() * 2.2 * (0.6 + F.dropEvent), grow: 2.4 + rnd() * 2, life: 14 + rnd() * 12, mi: 0.5 + rnd() });
         }
         M.dropBloom *= Math.exp(-dt / 6);   // a drop opens up over seconds and slowly closes again
         if (F.sectionChanged) {
@@ -449,7 +451,7 @@
             const variation = 1 + (rnd() - 0.5) * 1.1 * s;
             M.pulseV += clamp(kickEv, 0, 1.5) * 1.6 * I * accent * variation;
             const n = Math.max(1, Math.round(kickEv * (1 + 2 * s) * I));
-            for (let i = 0; i < n + 1; i++) addBloom({ u: 0.04 + rnd() * 0.18 });
+            for (let i = 0; i < n; i++) addBloom({ size: 0.7 + rnd() * 1.6, life: 10 + rnd() * 12, mi: 0.4 + rnd() * 0.8 });
         }
         [M.pulse, M.pulseV] = spring(M.pulse, M.pulseV, 0, 38, lerp(4, 7, S.smooth), dt);
         M.pulse = clamp(M.pulse, -0.15, 0.45);
@@ -471,23 +473,23 @@
         M.flow = env(M.flow, (0.012 + 0.05 * fullness * I) * (F.section === 'breakdown' ? 0.4 : 1), 1.5, 3, dt);
 
         // ---- percussion: delicate sparkles near the rim
-        if (percEv && rnd() < 0.5 * percEv) addBloom({ u: 0.55 + rnd() * 0.45, size: 0.25 + rnd() * 0.35, grow: 0.25, life: 1.2 + rnd(), fade: 0.8, shape: 1 });
+        if (percEv && rnd() < 0.4 * percEv) addBloom({ size: 0.25 + rnd() * 0.3, grow: 0.3, life: 1.4 + rnd(), fade: 0.9, shape: 0, mi: 1 });
 
         // ---- population follows the overall energy (thinner in breakdowns, fuller in drops)
-        const target = Math.round(clamp(55 + 90 * (F.active ? clamp(stats.rmsL * 3, 0, 1) : 0.15) * I + 40 * M.dropBloom, 45, 190) * Q.pop);
+        const target = Math.round(clamp(40 + 80 * (F.active ? clamp(stats.rmsL * 3, 0, 1) : 0.2) * I + 40 * M.dropBloom, 30, 170) * Q.pop);
         const living = blooms.filter(b => !b.dying).length;
-        if (living < target && rnd() < dt * 6) addBloom();
-        if (living > target + 10) { const b = blooms.find(x => !x.dying); if (b) { b.dying = true; b.dieAt = M.t; } }
+        if (living < target && rnd() < dt * 5) addBloom();
+        if (living > target + 12) { const b = blooms.find(x => !x.dying); if (b) { b.dying = true; b.dieAt = M.t; } }
 
+        // ---- the original's gentle morph, but with accumulated phases so energy changes never jolt it
+        M.energy = env(M.energy || 0.5, 0.3 + clamp(bass * I * 0.9, 0, 1.6) + M.dropBloom * 0.5, 0.15, lerp(0.6, 2, S.smooth), dt);
+        const tick = 30 * dt * (0.6 + 0.6 * I);         // half the original pace
         for (let i = blooms.length - 1; i >= 0; i--) {
             const b = blooms[i];
-            b.u += M.flow * b.depth * dt;
-            b.rot += b.spin * dt * (0.4 + 0.6 * S.rotation);
+            b.acc += b.sp * tick;
+            b.racc += b.sp * tick * M.energy * (0.4 + 0.6 * S.rotation);
             const age = M.t - b.born;
-            if (b.u > 1.08 || age > b.life + b.fade || (b.dying && M.t - b.dieAt > b.fade)) {
-                if (!b.dying && age < b.life && b.u > 1.08) { b.u = 0.03 + rnd() * 0.06; b.born = M.t; b.v = (rnd() - 0.5) * 0.9; }  // reborn at the centre
-                else blooms.splice(i, 1);
-            }
+            if (age > b.life + b.fade || (b.dying && M.t - b.dieAt > b.fade)) blooms.splice(i, 1);
         }
         M.glow = env(M.glow, F.kick * 0.6 + M.dropBloom * 0.4, 0.05, 0.6, dt);
     }
@@ -539,18 +541,27 @@
         let cx = W / 2, cy = H / 2, avail = Math.min(W, H);
         if (open && !phone) { cx = (W - 300) / 2; avail = Math.min(W - 300, H); }
         if (open && phone) { cy = H * 0.27; avail = Math.min(W, H * 0.52); }
-        return { cx, cy, R: avail * 0.44 * S.size };
+        return { cx, cy, R: avail * 0.46 * S.size };
     }
 
-    function drawSlices(cx, cy, R, n, rot, alpha, every, sizeMul) {
-        const half = R * Math.tan(Math.PI / n) * 1.02;
-        const tw = M.twist;
+    const WORLD_W = 900, WORLD_H = 700, WEDGE = 200;   // the original kaleidoscope's own units
+
+    function drawSlices(cx, cy, k, n, rot, alpha, every) {
+        const segW = WORLD_W / n, segH = WORLD_H / n;
+        const half = WEDGE * Math.tan(Math.PI / n) * 1.04;
+        const gf = 1.35 * M.scale;                         // overall growth: bass, builds and drops open it up
+        const E = M.energy || 0.5;
+        const T = M.t * 30;
+        const bulge = 1 + M.pulse * 0.9;                   // kicks push the shapes outward from within, then settle
         for (let i = 0; i < n; i++) {
             ctx.save();
             ctx.translate(cx, cy);
+            ctx.scale(k, k);
             ctx.rotate(i / n * Math.PI * 2 + rot);
-            ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(R * 1.02, -half); ctx.lineTo(R * 1.02, half); ctx.closePath(); ctx.clip();
+            ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(WEDGE, -half); ctx.lineTo(WEDGE, half); ctx.closePath(); ctx.clip();
             if (i % 2 === 1) ctx.scale(1, -1);
+            ctx.scale(bulge, bulge);
+            ctx.translate(-segW / 2, -segH / 2);
             for (let j = 0; j < blooms.length; j += every) {
                 const b = blooms[j];
                 const age = M.t - b.born;
@@ -558,17 +569,19 @@
                 if (age > b.life) a *= clamp(1 - (age - b.life) / b.fade, 0, 1);
                 if (b.dying) a *= clamp(1 - (M.t - b.dieAt) / b.fade, 0, 1);
                 if (a <= 0.01) continue;
-                const u = b.u + 0.02 * noise1(M.t * 0.2, b.salt) * (0.5 + S.surprise);
-                // bass bulges the inside more than the rim: the structure moves from within
-                const ru = u + M.pulse * u * (1 - Math.min(u, 1)) * 1.6;
-                const x = ru * R;
-                const y = (b.v + tw * 0.35 * Math.sin(u * Math.PI * 2 + M.t * 0.25 + b.salt)) * R * Math.tan(Math.PI / n) * u * 1.1
-                          + 0.012 * R * noise1(M.t * 0.25, b.salt + 3) * (0.5 + S.surprise);
-                const sz = R * 0.015 * b.size * sizeMul * (0.7 + 0.8 * Math.min(u, 1)) * (0.3 + 0.7 * a) * (1 + M.glow * 0.25);
+                let x = b.nx * segW + Math.sin(b.acc + b.phase) * 20 * E * b.mi;
+                let y = b.ny * segH + Math.cos(b.acc + b.phase) * 15 * E * b.mi;
+                y += Math.sin(x * 0.08 + M.t * 0.4 + b.phase) * M.twist * 14;      // organic bend
+                x = ((x % segW) + segW) % segW;
+                y = ((y % segH) + segH) % segH;
+                let size = clamp(b.size + Math.sin(T * b.pulseRate) * 3 * E, 1, 20);
+                const ageGrowth = Math.min(2, Math.max(0, age) * 0.06);          // like the original: shapes fill out over time
+                const fs = size * gf * (1 + ageGrowth) * (0.25 + 0.75 * a) * (1 + M.glow * 0.15);
                 ctx.globalAlpha = alpha * a;
                 ctx.save();
-                ctx.translate(x, y); ctx.rotate(b.rot + tw * u);
-                ctx.drawImage(sprite(b.shape, colorOf(b.ci)), -sz, -sz, sz * 2, sz * 2);
+                ctx.translate(x, y); ctx.rotate(b.rot + b.racc);
+                const d = fs / 0.42 / 2;                                          // half the sprite box; the shape's radius is 42% of the box
+                ctx.drawImage(sprite(b.shape, colorOf(b.ci)), -d, -d, d * 2, d * 2);
                 ctx.restore();
             }
             ctx.restore();
@@ -581,29 +594,34 @@
         ctx.globalCompositeOperation = 'source-over';
         ctx.fillStyle = 'rgba(0,0,0,' + (1 - S.trails).toFixed(3) + ')';
         ctx.fillRect(0, 0, W, H);
-        const { cx, cy, R: R0 } = layout();
-        const R = R0 * M.scale;
+        const { cx, cy, R } = layout();
+        const k = (R / (WEDGE * 0.55)) * (0.88 + 0.12 * M.scale);   // the mandala itself fills the window
 
-        if (S.depth) drawSlices(cx, cy, R * 1.5, M.segCur, M.backRot, 0.16, Q.backEvery, 0.7);
-        if (M.segFade < 1) drawSlices(cx, cy, R, M.segPrev, M.rot, 1 - M.segFade, 1, 1);
-        drawSlices(cx, cy, R, M.segCur, M.rot, M.segFade < 1 ? M.segFade : 1, 1, 1);
+        if (S.depth) drawSlices(cx, cy, k * 1.5, M.segCur, M.backRot, 0.16, Q.backEvery);
+        if (M.segFade < 1) drawSlices(cx, cy, k, M.segPrev, M.rot, 1 - M.segFade, 1);
+        drawSlices(cx, cy, k, M.segCur, M.rot, M.segFade < 1 ? M.segFade : 1, 1);
 
+        // The original's glowing centre and energy rings
         const pal = palette();
-        const c0 = pal[Math.floor(M.t * 0.15 + M.palShift) % pal.length];
-        const cs = R * (0.22 + 0.1 * M.pulse + 0.15 * M.glow);
-        const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, cs);
-        g.addColorStop(0, c0 + '66'); g.addColorStop(1, 'transparent');
-        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, cs, 0, Math.PI * 2); ctx.fill();
-
+        const gf = 1.35 * M.scale, E = M.energy || 0.5, T = M.t * 30;
+        const complexity = clamp(0.6 + F.build + M.dropBloom, 0, 2);
+        ctx.save();
+        ctx.translate(cx, cy); ctx.scale(k, k);
+        const cs = Math.max(1, (50 + complexity * 30) * gf);
+        const g = ctx.createRadialGradient(0, 0, 0, 0, 0, cs);
+        g.addColorStop(0, pal[Math.floor(T * 0.01 + M.palShift) % pal.length] + '44'); g.addColorStop(1, 'transparent');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, Math.max(0, cs + Math.sin(T * 0.02) * 20 * gf), 0, Math.PI * 2); ctx.fill();
         if (S.rings) {
-            for (let r = 0; r < 4; r++) {
-                ctx.strokeStyle = pal[(r + Math.floor(M.t * 0.08) + M.palShift) % pal.length] + '33';
-                ctx.lineWidth = 1.5 + M.glow * 2;
+            const count = Math.min(5, 3 + Math.floor(complexity));
+            for (let r = 0; r < count; r++) {
+                ctx.strokeStyle = pal[(r + Math.floor(T * 0.005) + M.palShift) % pal.length] + '33';
+                ctx.lineWidth = (2 + complexity) / Math.max(1, k * 0.8);
                 ctx.beginPath();
-                const rr = R * (0.38 + r * 0.19) * (1 + M.pulse * (0.6 - r * 0.12)) + 6 * noise1(M.t * 0.3, r);
-                ctx.arc(cx, cy, Math.max(0, rr), 0, Math.PI * 2); ctx.stroke();
+                const rr = ((120 + r * 60) * (0.55 + 0.45 * gf) * (1 + M.pulse * 0.3) + Math.sin(T * 0.01 + r) * 30 * E * 0.6) * 0.62;
+                ctx.arc(0, 0, Math.max(0, rr), 0, Math.PI * 2); ctx.stroke();
             }
         }
+        ctx.restore();
     }
 
     // =====================================================================
@@ -795,7 +813,7 @@
     // Debug view for testing (read-only)
     window.__kaleido = { F, M, blooms };
 
-    for (let i = 0; i < 70; i++) addBloom({ born: -rnd() * 3 });
+    for (let i = 0; i < 45; i++) addBloom({ born: -rnd() * 20 });
     requestAnimationFrame(frame);
 })();
 </script>
