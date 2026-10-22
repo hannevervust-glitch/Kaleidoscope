@@ -19,4 +19,4 @@ A morphing, interactive kaleidoscope that grows and changes over time.
 | Music: reacts to a track or your microphone | `/music/` | planned |
 | Breathing: slow pulse for yoga and meditation | `/breathing/` | planned |
 
-New versions live in their own folder on `main`, so each has its own link. Experiments happen on branches and are merged back when they are ready. Milestones are tagged (`v1-morphing`, …).
+New versions live in their own folder on `main`, so each has its own link. Experiments happen on branches and are merged back when they are ready.
