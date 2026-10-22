@@ -190,11 +190,11 @@
     const DEFAULTS = {
         surprise: 0.35, intensity: 1, bloom: 1, bassSens: 1, percSens: 1, rotation: 0.6,
         distortion: 0.3, smooth: 0.6, trails: 0.25, symmetry: true,
-        size: 1, mirrors: 12, palette: 'Neon', shapes: [true, true, true, true], rings: true, depth: true, seed: 1
+        size: 1, mirrors: 12, palette: 'Neon', shapes: [true, true, true, true], rings: true, depth: false, seed: 1
     };
     let S = { ...DEFAULTS };
-    try { const v = JSON.parse(localStorage.getItem('kaleido-music-v2') || 'null'); if (v && typeof v === 'object') S = { ...DEFAULTS, ...v }; } catch (e) {}
-    const save = () => { try { localStorage.setItem('kaleido-music-v2', JSON.stringify(S)); } catch (e) {} };
+    try { const v = JSON.parse(localStorage.getItem('kaleido-music-v3') || 'null'); if (v && typeof v === 'object') S = { ...DEFAULTS, ...v }; } catch (e) {}
+    const save = () => { try { localStorage.setItem('kaleido-music-v3', JSON.stringify(S)); } catch (e) {} };
 
     const PALETTES = {
         'Neon': ['#FF1493','#FF69B4','#FF6347','#FFD700','#FFA500','#00CED1','#32CD32','#9370DB','#DC143C','#FF4500','#00FF7F','#1E90FF','#8A2BE2','#00FA9A','#FF8C00','#DA70D6','#40E0D0'],
@@ -391,9 +391,9 @@
     function addBloom(opts) {
         const shapes = enabledShapes();
         blooms.push(Object.assign({
-            u: 0.08 + rnd() * 0.85,                 // radial position in the slice (0 centre, 1 rim)
+            u: 0.1 + Math.pow(rnd(), 1.4) * 0.8,    // radial position in the slice (0 centre, 1 rim); denser towards the inside
             v: (rnd() - 0.5) * 0.9,                 // across the slice
-            size: 0.6 + rnd() * 1.1,
+            size: 0.5 + Math.pow(rnd(), 2) * 1.8,   // mostly small jewels, a few larger ones
             shape: shapes[Math.floor(rnd() * shapes.length)],
             ci: Math.floor(rnd() * 64),
             rot: rnd() * Math.PI * 2,
@@ -421,7 +421,7 @@
         if (F.dropEvent) {
             M.dropBloom = Math.min(1.4, M.dropBloom + (0.15 + 0.55 * F.dropEvent) * S.bloom);
             M.palShift += 3 + Math.floor(rnd() * 4);
-            const n = Math.round(8 + 10 * F.dropEvent);
+            const n = Math.round(16 + 20 * F.dropEvent);
             for (let i = 0; i < n; i++) addBloom({ u: 0.04 + rnd() * 0.25, size: 1 + rnd() * 1.4 * (0.6 + F.dropEvent), grow: 2.4 + rnd() * 2, life: 10 + rnd() * 10 });
         }
         M.dropBloom *= Math.exp(-dt / 6);   // a drop opens up over seconds and slowly closes again
@@ -449,7 +449,7 @@
             const variation = 1 + (rnd() - 0.5) * 1.1 * s;
             M.pulseV += clamp(kickEv, 0, 1.5) * 1.6 * I * accent * variation;
             const n = Math.max(1, Math.round(kickEv * (1 + 2 * s) * I));
-            for (let i = 0; i < n; i++) addBloom({ u: 0.04 + rnd() * 0.18 });
+            for (let i = 0; i < n + 1; i++) addBloom({ u: 0.04 + rnd() * 0.18 });
         }
         [M.pulse, M.pulseV] = spring(M.pulse, M.pulseV, 0, 38, lerp(4, 7, S.smooth), dt);
         M.pulse = clamp(M.pulse, -0.15, 0.45);
@@ -474,7 +474,7 @@
         if (percEv && rnd() < 0.5 * percEv) addBloom({ u: 0.55 + rnd() * 0.45, size: 0.25 + rnd() * 0.35, grow: 0.25, life: 1.2 + rnd(), fade: 0.8, shape: 1 });
 
         // ---- population follows the overall energy (thinner in breakdowns, fuller in drops)
-        const target = Math.round(clamp(24 + 50 * (F.active ? clamp(stats.rmsL * 3, 0, 1) : 0.15) * I + 22 * M.dropBloom, 18, 100) * Q.pop);
+        const target = Math.round(clamp(55 + 90 * (F.active ? clamp(stats.rmsL * 3, 0, 1) : 0.15) * I + 40 * M.dropBloom, 45, 190) * Q.pop);
         const living = blooms.filter(b => !b.dying).length;
         if (living < target && rnd() < dt * 6) addBloom();
         if (living > target + 10) { const b = blooms.find(x => !x.dying); if (b) { b.dying = true; b.dieAt = M.t; } }
@@ -564,7 +564,7 @@
                 const x = ru * R;
                 const y = (b.v + tw * 0.35 * Math.sin(u * Math.PI * 2 + M.t * 0.25 + b.salt)) * R * Math.tan(Math.PI / n) * u * 1.1
                           + 0.012 * R * noise1(M.t * 0.25, b.salt + 3) * (0.5 + S.surprise);
-                const sz = R * 0.032 * b.size * sizeMul * (0.6 + 0.7 * Math.min(u, 1)) * (0.3 + 0.7 * a) * (1 + M.glow * 0.2);
+                const sz = R * 0.015 * b.size * sizeMul * (0.7 + 0.8 * Math.min(u, 1)) * (0.3 + 0.7 * a) * (1 + M.glow * 0.25);
                 ctx.globalAlpha = alpha * a;
                 ctx.save();
                 ctx.translate(x, y); ctx.rotate(b.rot + tw * u);
@@ -795,7 +795,7 @@
     // Debug view for testing (read-only)
     window.__kaleido = { F, M, blooms };
 
-    for (let i = 0; i < 34; i++) addBloom({ born: -rnd() * 3 });
+    for (let i = 0; i < 70; i++) addBloom({ born: -rnd() * 3 });
     requestAnimationFrame(frame);
 })();
 </script>
