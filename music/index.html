@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <style>[hidden]{display:none!important}</style>
-<title>Kaleidoscope Music</title>
+<title>Soundbloom</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600&family=DM+Mono:wght@400&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=DM+Mono:wght@400&display=swap">
 <style>
     /* Layout: full-window kaleidoscope behind a glass control panel docked right (bottom sheet on phones) */
     :root {
@@ -19,7 +19,7 @@
         --line: rgba(255, 140, 190, 0.22);
         --accent: #ff4fa3;
         --accent-ink: #1a0610;
-        --font-ui: "Sora", "Helvetica Neue", Arial, sans-serif;
+        --font-ui: "Instrument Sans", "Helvetica Neue", Arial, sans-serif;
         --font-data: "DM Mono", ui-monospace, Menlo, monospace;
         color-scheme: dark;
     }
@@ -48,7 +48,10 @@
     }
     body.panel-closed .panel { transform: translateX(110%); opacity: 0; pointer-events: none; }
     .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-    .panel-head h1 { font-size: 15px; font-weight: 600; margin: 0; }
+    .panel-head h1 { font-size: 22px; font-weight: 600; margin: 0; letter-spacing: -.01em; line-height: 1.05; }
+    .panel-head h1 small { display: block; font-size: 11px; font-weight: 500; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-top: 5px; }
+    .intro { font-size: 13px; line-height: 1.5; margin: -4px 0 0; }
+    .intro + .hint { margin-top: -8px; }
     .hint { font-size: 11.5px; color: var(--muted); line-height: 1.5; margin: -6px 0 0; }
     .section { display: flex; flex-direction: column; gap: 10px; padding-top: 14px; border-top: 1px solid var(--line); }
     .section h2 { margin: 0; font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .14em; color: var(--accent); }
@@ -109,10 +112,11 @@
 
 <aside class="panel" id="panel" aria-label="Kaleidoscope music options">
     <div class="panel-head">
-        <h1>Kaleidoscope · Music</h1>
+        <h1>Soundbloom<small>Atmospheric music visualiser</small></h1>
         <button class="btn" id="closePanel" aria-label="Hide options">Hide</button>
     </div>
-    <p class="hint">Play music and the kaleidoscope blooms with it. Click for a bloom. F fullscreen, H hides this panel, N new variation.</p>
+    <p class="intro">Play music and let this artwork bloom with it. Play with the settings. Add energy by snapping your fingers, clapping or clicking: the more energy you give it, the more it blooms.</p>
+    <p class="hint">F fullscreen · H hides this panel · N new variation</p>
 
     <div class="section" style="border-top:0;padding-top:0">
         <h2>Sound</h2>
@@ -129,7 +133,7 @@
             <div class="meter">Bass<span><i id="mBass"></i></span></div>
             <div class="meter">Kick<span><i id="mKick"></i></span></div>
             <div class="meter">Perc<span><i id="mPerc"></i></span></div>
-            <div class="meter">Bright<span><i id="mBright"></i></span></div>
+            <div class="meter">Energy<span><i id="mBright"></i></span></div>
         </div>
         <div class="readout"><span id="bpmOut">– BPM</span><span id="sectionOut">no sound yet</span></div>
         <p class="msg" id="soundMsg">Without sound it sleeps. Choose the microphone or load a song or DJ set to wake it up.</p>
@@ -413,7 +417,7 @@
         const k = lerp(26, 5, S.smooth), d = 2 * Math.sqrt(k) * lerp(0.8, 1.05, S.smooth);
 
         // Sleep: with no sound (or near-silence) it slowly settles, dims and almost stops
-        const hearing = F.active && F.rms > 0.015;
+        const hearing = (F.active && F.rms > 0.015) || t - (M.lastEnergy || -99) < 5;   // a snap or click also wakes it
         M.awake = env(M.awake == null ? 0 : M.awake, hearing ? 1 : 0, 0.35, 3.5, dt);
         const aw = M.awake;
 
@@ -446,7 +450,7 @@
             ? 0.025 * (1 - s) * Math.pow(Math.sin(F.beatPhase * Math.PI), 2)       // locked to the tempo (structure)
             : 0.02 * noise1(t * 0.3, 3);
         const sleepBreath = 0.012 * Math.sin(t * Math.PI * 2 / 12);   // a very slow, faint breath while asleep
-        const scaleTarget = lerp(0.9 + sleepBreath, 1 + clamp(bass, 0, 1.2) * 0.12 * I + M.dropBloom * 0.4 + F.build * 0.05 * I + F.contour * 0.04 + breathe, aw);
+        const scaleTarget = (M.given || 0) * 0.32 + lerp(0.9 + sleepBreath, 1 + clamp(bass, 0, 1.2) * 0.12 * I + M.dropBloom * 0.4 + F.build * 0.05 * I + F.contour * 0.04 + breathe, aw);
         [M.scale, M.scaleV] = spring(M.scale, M.scaleV, scaleTarget, k * 0.6, d * 0.8, dt);
         M.scale = clamp(M.scale, 0.75, 1.65);
 
@@ -479,9 +483,12 @@
 
         // ---- percussion: delicate sparkles near the rim
         if (percEv && rnd() < 0.4 * percEv) addBloom({ size: 0.25 + rnd() * 0.3, grow: 0.3, life: 1.4 + rnd(), fade: 0.9, shape: 0, mi: 1 });
+        // snaps and claps are sharp, strong percussive sounds: they count as energy given to the artwork
+        if (F.percEvent > 0.55) giveEnergy(0.35 + 0.4 * Math.min(1, F.percEvent * S.percSens));
+        M.given = (M.given || 0) * Math.exp(-dt / 7);
 
         // ---- population follows the overall energy (thinner in breakdowns, fuller in drops)
-        const target = Math.round(clamp(40 + 80 * (F.active ? clamp(stats.rmsL * 3, 0, 1) : 0.2) * I + 40 * M.dropBloom, 30, 170) * Q.pop);
+        const target = Math.round(clamp(40 + 80 * (F.active ? clamp(stats.rmsL * 3, 0, 1) : 0.2) * I + 40 * M.dropBloom + 45 * (M.given || 0), 30, 190) * Q.pop);
         const living = blooms.filter(b => !b.dying).length;
         if (living < target && rnd() < dt * 5 * aw) addBloom();
         if (living > target + 12) { const b = blooms.find(x => !x.dying); if (b) { b.dying = true; b.dieAt = M.t; } }
@@ -732,11 +739,11 @@
         $('mBass').style.height = Math.min(100, F.bass * 150) + '%';
         $('mKick').style.height = Math.min(100, F.kick * 90) + '%';
         $('mPerc').style.height = Math.min(100, F.perc * 90) + '%';
-        $('mBright').style.height = Math.min(100, F.bright * 100) + '%';
+        $('mBright').style.height = Math.min(100, (M.given || 0) / 1.6 * 100) + '%';
         if (A.el && A.el.duration) $('progressBar').style.width = (100 * A.el.currentTime / A.el.duration) + '%';
         if (++meterTick % 15 === 0) {
             $('bpmOut').textContent = F.active && F.beatConf > 0.35 ? F.bpm + ' BPM' : '– BPM';
-            $('sectionOut').textContent = (M.awake || 0) < 0.3 ? 'asleep' : F.active ? SECTION_NAMES[F.section] : 'falling asleep';
+            $('sectionOut').textContent = (M.awake || 0) < 0.3 ? 'asleep' : (F.active && F.rms > 0.015) ? SECTION_NAMES[F.section] : (M.given || 0) > 0.1 ? 'blooming from your energy' : 'falling asleep';
         }
     }
 
@@ -786,7 +793,19 @@
         });
     });
 
-    function manualBloom() { F.dropEvent = 0; M.dropBloom = Math.min(1.4, M.dropBloom + 0.35 * S.bloom); M.pulseV += 1.2; M.palShift += 2; for (let i = 0; i < 14; i++) addBloom({ u: 0.04 + rnd() * 0.2, size: 1 + rnd(), grow: 2 + rnd() * 1.5 }); }
+    // Energy given by the people in the room: each snap, clap or click adds a little, and it slowly fades
+    let lastGive = -1;
+    function giveEnergy(amount) {
+        if (M.t - lastGive < 0.12) return;
+        lastGive = M.t;
+        M.lastEnergy = M.t;
+        M.given = Math.min(1.6, (M.given || 0) + amount * 0.22 * S.bloom);
+        M.pulseV += 0.6 * amount;
+        const n = 2 + Math.round(4 * amount * (0.5 + (M.given || 0)));
+        for (let i = 0; i < n; i++) addBloom({ size: 0.8 + rnd() * 1.6, grow: 1.4 + rnd(), life: 10 + rnd() * 10, mi: 0.5 + rnd() * 0.8 });
+        if (M.given > 1.2 && rnd() < 0.25) M.palShift += 1;
+    }
+    function manualBloom() { giveEnergy(1); }
     function newVariation() {
         S.seed = (S.seed * 7 + 13) % 100003; reseed(S.seed); save();
         M.dir *= -1; M.palShift += 5; M.segPrev = M.segCur; M.segCur = clamp(S.mirrors + [-2, 0, 2, 4][Math.floor(rnd() * 4)], 6, 20); M.segFade = 0;
