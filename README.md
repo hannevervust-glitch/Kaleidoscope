@@ -16,7 +16,7 @@ A morphing, interactive kaleidoscope that grows and changes over time.
 | Version | Where | Status |
 | --- | --- | --- |
 | Morphing kaleidoscope with options | `/` (this page) | live |
-| Soundbloom: atmospheric music visualiser that blooms with music, snaps, claps and clicks | [`/music/`](https://hannevervust-glitch.github.io/Kaleidoscope/music/) | live |
+| Resonance: atmospheric music visualiser that vibes with music, snaps, claps and clicks | [`/music/`](https://hannevervust-glitch.github.io/Kaleidoscope/music/) | live |
 | Breathing: slow pulse for yoga and meditation | `/breathing/` | planned |
 
 New versions live in their own folder on `main`, so each has its own link. Experiments happen on branches and are merged back when they are ready.
