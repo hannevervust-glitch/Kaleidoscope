@@ -1,0 +1,622 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>[hidden]{display:none!important}</style>
+<title>Morphing Kaleidoscope Pattern</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600&family=DM+Mono:wght@400&display=swap">
+<style>
+    /* Layout: full-screen canvas stage with a glass control panel docked right (bottom sheet on phones) */
+    :root {
+        --bg: #000;
+        --fg: #f6eef4;
+        --muted: #b7a6b3;
+        --panel: rgba(18, 10, 18, 0.78);
+        --line: rgba(255, 140, 190, 0.22);
+        --accent: #ff4fa3;
+        --accent-ink: #1a0610;
+        --font-ui: "Sora", "Helvetica Neue", Arial, sans-serif;
+        --font-data: "DM Mono", ui-monospace, Menlo, monospace;
+        color-scheme: dark;
+    }
+    html, body { height: 100%; }
+    body {
+        margin: 0;
+        padding-block: 0;
+        padding-left: max(16px, env(safe-area-inset-left, 0px));
+        padding-right: max(16px, env(safe-area-inset-right, 0px));
+        background: var(--bg);
+        color: var(--fg);
+        font-family: var(--font-ui);
+        overflow: hidden;
+        box-sizing: border-box;
+    }
+    .stage {
+        height: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding-right: 300px;
+        box-sizing: border-box;
+        transition: padding-right .25s ease;
+    }
+    body.panel-closed .stage { padding-right: 0; }
+    canvas {
+        border-radius: 10px;
+        box-shadow: 0 0 50px rgba(255, 100, 150, 0.3);
+        max-width: 100%;
+        max-height: 100%;
+        height: auto;
+        touch-action: none;
+        cursor: crosshair;
+    }
+
+    .panel {
+        position: fixed;
+        top: calc(16px + env(safe-area-inset-top, 0px));
+        right: calc(16px + env(safe-area-inset-right, 0px));
+        bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+        width: 268px;
+        overflow-y: auto;
+        background: var(--panel);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 16px;
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        transition: transform .25s ease, opacity .25s ease;
+    }
+    body.panel-closed .panel { transform: translateX(110%); opacity: 0; pointer-events: none; }
+
+    .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .panel-head h1 { font-size: 15px; font-weight: 600; margin: 0; letter-spacing: .01em; }
+    .hint { font-size: 11.5px; color: var(--muted); line-height: 1.5; margin: -8px 0 0; }
+
+    .group { display: flex; flex-direction: column; gap: 8px; }
+    .label {
+        font-size: 10.5px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted);
+        display: flex; justify-content: space-between; align-items: baseline;
+    }
+    .label output { font-family: var(--font-data); font-size: 12px; color: var(--fg); letter-spacing: 0; text-transform: none; }
+
+    .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .btn, .chip, .seg button {
+        font: inherit; font-size: 12.5px; color: var(--fg);
+        background: transparent; border: 1px solid var(--line); border-radius: 8px;
+        padding: 7px 8px; cursor: pointer;
+        transition: background .15s, border-color .15s, color .15s;
+    }
+    .btn:hover, .chip:hover, .seg button:hover { border-color: var(--accent); }
+    .seg button[aria-pressed="true"], .chip[aria-pressed="true"] {
+        background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600;
+    }
+    .chip { border-radius: 999px; padding: 5px 11px; }
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    input[type="range"] { width: 100%; accent-color: var(--accent); margin: 0; }
+
+    .palettes { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .pal {
+        font: inherit; font-size: 11.5px; color: var(--fg); text-align: left;
+        background: transparent; border: 1px solid var(--line); border-radius: 8px;
+        padding: 6px; cursor: pointer; display: flex; flex-direction: column; gap: 5px;
+    }
+    .pal[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+    .swatch { display: flex; height: 10px; border-radius: 3px; overflow: hidden; }
+    .swatch i { flex: 1; }
+
+    .toggle { display: flex; align-items: center; justify-content: space-between; font-size: 12.5px; cursor: pointer; }
+    .toggle input { accent-color: var(--accent); width: 16px; height: 16px; }
+
+    .actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: auto; }
+    .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+
+    .open-btn {
+        position: fixed;
+        top: calc(16px + env(safe-area-inset-top, 0px));
+        right: calc(16px + env(safe-area-inset-right, 0px));
+        background: var(--panel); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    }
+    .close-btn { padding: 4px 10px; }
+
+    @media (max-width: 720px) {
+        .stage { padding-right: 0; padding-bottom: 46vh; }
+        body.panel-closed .stage { padding-bottom: 0; }
+        .panel {
+            top: auto; left: calc(8px + env(safe-area-inset-left, 0px)); right: calc(8px + env(safe-area-inset-right, 0px));
+            bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+            width: auto; max-height: 44vh;
+        }
+        body.panel-closed .panel { transform: translateY(110%); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .panel, .stage { transition: none; }
+    }
+</style>
+</head>
+<body>
+<div class="stage">
+    <canvas id="kaleidoscopeCanvas" aria-label="Animated kaleidoscope. Click to add energy waves."></canvas>
+</div>
+
+<button class="btn open-btn" id="openPanel" hidden>Options</button>
+
+<aside class="panel" id="panel" aria-label="Kaleidoscope options">
+    <div class="panel-head">
+        <h1>Kaleidoscope</h1>
+        <button class="btn close-btn" id="closePanel" aria-label="Hide options">Hide</button>
+    </div>
+    <p class="hint">Click the pattern for a burst of energy. Space switches mode, P pauses, H hides this panel.</p>
+
+    <div class="group">
+        <span class="label">Morph mode</span>
+        <div class="seg" id="modeSeg">
+            <button id="mode0" data-mode="0" aria-pressed="true">Wave</button>
+            <button id="mode1" data-mode="1" aria-pressed="false">Spiral</button>
+            <button id="mode2" data-mode="2" aria-pressed="false">Explode</button>
+        </div>
+    </div>
+
+    <div class="group">
+        <label class="label" for="segments">Mirrors <output id="segmentsOut">12</output></label>
+        <input type="range" id="segments" min="4" max="32" step="2" value="12">
+    </div>
+
+    <div class="group">
+        <label class="label" for="speed">Speed <output id="speedOut">1.0×</output></label>
+        <input type="range" id="speed" min="0.1" max="3" step="0.1" value="1">
+    </div>
+
+    <div class="group">
+        <label class="label" for="radius">Size <output id="radiusOut">200</output></label>
+        <input type="range" id="radius" min="120" max="340" step="10" value="200">
+    </div>
+
+    <div class="group">
+        <label class="label" for="density">Density <output id="densityOut">30</output></label>
+        <input type="range" id="density" min="10" max="200" step="10" value="30">
+    </div>
+
+    <div class="group">
+        <span class="label">Palette</span>
+        <div class="palettes" id="palettes"></div>
+    </div>
+
+    <div class="group">
+        <span class="label">Shapes</span>
+        <div class="chips" id="shapeChips">
+            <button class="chip" id="shape0" data-shape="0" aria-pressed="true">Circles</button>
+            <button class="chip" id="shape1" data-shape="1" aria-pressed="true">Stars</button>
+            <button class="chip" id="shape2" data-shape="2" aria-pressed="true">Diamonds</button>
+            <button class="chip" id="shape3" data-shape="3" aria-pressed="true">Flowers</button>
+        </div>
+    </div>
+
+    <div class="group">
+        <label class="toggle" for="trails">Light trails <input type="checkbox" id="trails"></label>
+        <label class="toggle" for="rings">Energy rings <input type="checkbox" id="rings" checked></label>
+        <label class="toggle" for="spin">Slow rotation <input type="checkbox" id="spin"></label>
+    </div>
+
+    <div class="actions">
+        <button class="btn" id="pauseBtn">Pause</button>
+        <button class="btn primary" id="burstBtn">Burst</button>
+        <button class="btn" id="resetBtn">Reset</button>
+    </div>
+</aside>
+
+<script>
+    const canvas = document.getElementById('kaleidoscopeCanvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = 900;
+    canvas.height = 700;
+
+    // ---------- Palettes ----------
+    const PALETTES = {
+        'Neon': ['#FF1493','#FF69B4','#FF6347','#FFD700','#FFA500','#00CED1','#32CD32','#9370DB','#DC143C','#FF4500','#00FF7F','#1E90FF','#8A2BE2','#00FA9A','#FF8C00','#DA70D6','#40E0D0'],
+        'Sunset': ['#FF5E5B','#FF9F1C','#FFBF69','#FFD166','#F15BB5','#C0392B','#FF7B54','#FFB26B','#E85D75','#FDCB6E'],
+        'Groovy 70s': ['#E76F51','#F4A261','#E9C46A','#2A9D8F','#D62828','#F77F00','#FCBF49','#BC6C25','#DDA15E','#B5838D'],
+        'Ocean': ['#03045E','#0077B6','#00B4D8','#90E0EF','#CAF0F8','#48CAE4','#00F5D4','#4361EE','#7209B7','#4CC9F0'],
+        'Forest': ['#2D6A4F','#40916C','#52B788','#74C69D','#B7E4C7','#D8F3DC','#95D5B2','#ADC178','#DDE5B6','#A98467'],
+        'Pastel': ['#FFADAD','#FFD6A5','#FDFFB6','#CAFFBF','#9BF6FF','#A0C4FF','#BDB2FF','#FFC6FF'],
+        'Gemstone': ['#9B1D20','#3D2B56','#0B6E4F','#1D3557','#E0B1CB','#7B2CBF','#C9184A','#118AB2','#F4D35E','#5E548E'],
+        'Moonlight': ['#FFFFFF','#E0E1DD','#C9D6DF','#A9B4C2','#778DA9','#D8E2DC','#F1FAEE','#BFC0C0']
+    };
+
+    // ---------- Settings (remembered per viewer when possible) ----------
+    const defaults = {
+        mode: 0, segments: 12, speed: 1, radius: 200, density: 30,
+        palette: 'Neon', shapes: [true, true, true, true],
+        trails: false, rings: true, spin: false
+    };
+    let settings = { ...defaults };
+    try {
+        const saved = JSON.parse(localStorage.getItem('kaleido-settings') || 'null');
+        if (saved && typeof saved === 'object') settings = { ...defaults, ...saved };
+        if (!PALETTES[settings.palette]) settings.palette = defaults.palette;
+    } catch (e) {}
+    function save() {
+        try { localStorage.setItem('kaleido-settings', JSON.stringify(settings)); } catch (e) {}
+    }
+
+    // ---------- State ----------
+    let time = 0;
+    let frame = 0;
+    let paused = false;
+    let mouseX = canvas.width / 2;
+    let mouseY = canvas.height / 2;
+    let energy = 1;
+    let growthFactor = 0.1;
+    let complexity = 0;
+    let spinAngle = 0;
+    const patterns = [];
+
+    const colors = () => PALETTES[settings.palette];
+    const colorOf = (p) => { const c = colors(); return c[p.colorIndex % c.length]; };
+    const alphaHex = (a) => Math.max(0, Math.min(255, Math.floor(a))).toString(16).padStart(2, '0');
+
+    function enabledShapes() {
+        const s = [];
+        settings.shapes.forEach((on, i) => { if (on) s.push(i); });
+        return s.length ? s : [0, 1, 2, 3];
+    }
+    function randomShape() { const s = enabledShapes(); return s[Math.floor(Math.random() * s.length)]; }
+    function segW() { return canvas.width / settings.segments; }
+    function segH() { return canvas.height / settings.segments; }
+
+    function makePattern(extra) {
+        return Object.assign({
+            x: Math.random() * segW(),
+            y: Math.random() * segH(),
+            size: Math.random() * 3 + 1,
+            colorIndex: Math.floor(Math.random() * 64),
+            shape: randomShape(),
+            rotation: Math.random() * Math.PI * 2,
+            speed: 0.005 + Math.random() * 0.01,
+            phase: Math.random() * Math.PI * 2,
+            pulseRate: 0.01 + Math.random() * 0.02,
+            morphIntensity: 0.2 + Math.random() * 0.5,
+            birthTime: time
+        }, extra || {});
+    }
+
+    function initPatterns() {
+        for (let i = 0; i < settings.density; i++) patterns.push(makePattern());
+    }
+
+    function drawShape(pattern, x, y, size, rotation) {
+        const color = colorOf(pattern);
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(rotation);
+
+        const age = time - (pattern.birthTime || 0);
+        const ageGrowth = Math.min(2, age * 0.001);
+        const finalSize = size * growthFactor * (1 + ageGrowth);
+
+        const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, finalSize);
+        gradient.addColorStop(0, color);
+        gradient.addColorStop(0.7, color + 'AA');
+        gradient.addColorStop(1, color + '33');
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+
+        switch (pattern.shape) {
+            case 0:
+                ctx.arc(0, 0, finalSize, 0, Math.PI * 2);
+                break;
+            case 1: {
+                const spikes = 6;
+                for (let i = 0; i < spikes * 2; i++) {
+                    const angle = (i / (spikes * 2)) * Math.PI * 2;
+                    const radius = (i % 2 === 0) ? finalSize : finalSize * 0.5;
+                    const px = Math.cos(angle) * radius, py = Math.sin(angle) * radius;
+                    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+                }
+                ctx.closePath();
+                break;
+            }
+            case 2:
+                ctx.moveTo(0, -finalSize);
+                ctx.lineTo(finalSize, 0);
+                ctx.lineTo(0, finalSize);
+                ctx.lineTo(-finalSize, 0);
+                ctx.closePath();
+                break;
+            case 3: {
+                const petals = 8;
+                for (let i = 0; i < petals; i++) {
+                    const angle = (i / petals) * Math.PI * 2;
+                    const petalSize = finalSize * (0.8 + 0.4 * Math.sin(time * 0.02 + i));
+                    const px = Math.cos(angle) * petalSize, py = Math.sin(angle) * petalSize;
+                    ctx.moveTo(px * 0.5 + finalSize * 0.4, py * 0.5);
+                    ctx.arc(px * 0.5, py * 0.5, finalSize * 0.4, 0, Math.PI * 2);
+                }
+                break;
+            }
+        }
+        ctx.fill();
+
+        ctx.fillStyle = color + alphaHex(102 * (1 + ageGrowth));
+        ctx.beginPath();
+        ctx.arc(0, 0, finalSize * 0.3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    }
+
+    function drawKaleidoscopeSegment() {
+        const sw = segW(), sh = segH();
+        const mode = settings.mode;
+        for (let p = 0; p < patterns.length; p++) {
+            const pattern = patterns[p];
+            if (!pattern || !settings.shapes[pattern.shape]) continue;
+
+            let mx = pattern.x, my = pattern.y, ms = pattern.size, mr = pattern.rotation;
+            const dist = Math.hypot(mouseX - mx, mouseY - my);
+
+            if (mode === 0) {
+                mx += Math.sin(time * pattern.speed + pattern.phase) * 20 * energy * pattern.morphIntensity;
+                my += Math.cos(time * pattern.speed + pattern.phase) * 15 * energy * pattern.morphIntensity;
+                ms += Math.sin(time * pattern.pulseRate) * 3 * energy;
+                mr += time * pattern.speed * energy;
+            } else if (mode === 1) {
+                const a = Math.atan2(my - sh / 2, mx - sw / 2) + time * 0.01 * energy;
+                const r = Math.hypot(mx - sw / 2, my - sh / 2);
+                mx = sw / 2 + Math.cos(a) * (r + Math.sin(time * 0.02) * 10 * energy);
+                my = sh / 2 + Math.sin(a) * (r + Math.cos(time * 0.02) * 10 * energy);
+                ms += Math.sin(a + time * 0.03) * 4 * energy;
+                mr = a;
+            } else {
+                const f = energy * pattern.morphIntensity * Math.max(0, 1 - dist / 200);
+                if (f > 0) {
+                    const a = Math.atan2(my - mouseY, mx - mouseX);
+                    mx += Math.cos(a) * f * 30;
+                    my += Math.sin(a) * f * 30;
+                    ms += f * 5;
+                    mr += f * 2;
+                }
+            }
+
+            mx = ((mx % sw) + sw) % sw;
+            my = ((my % sh) + sh) % sh;
+            ms = Math.max(1, Math.min(20, ms));
+            drawShape(pattern, mx, my, ms, mr);
+        }
+    }
+
+    function drawKaleidoscope() {
+        if (settings.trails) {
+            ctx.fillStyle = 'rgba(0,0,0,0.12)';
+        } else {
+            ctx.fillStyle = '#000';
+        }
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        const n = settings.segments;
+        const R = settings.radius;
+        const half = R * Math.tan(Math.PI / n) * 1.02; // wedges meet with no gaps
+        const cx = canvas.width / 2, cy = canvas.height / 2;
+
+        for (let i = 0; i < n; i++) {
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate((i / n) * Math.PI * 2 + spinAngle);
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(R, -half);
+            ctx.lineTo(R, half);
+            ctx.closePath();
+            ctx.clip();
+            if (i % 2 === 1) ctx.scale(1, -1);
+            ctx.translate(-segW() / 2, -segH() / 2);
+            drawKaleidoscopeSegment();
+            ctx.restore();
+        }
+
+        const pal = colors();
+        ctx.save();
+        ctx.translate(cx, cy);
+        const centralSize = Math.max(1, (50 + complexity * 30) * growthFactor);
+        const g = ctx.createRadialGradient(0, 0, 0, 0, 0, centralSize);
+        g.addColorStop(0, pal[Math.floor(time * 0.01) % pal.length] + '44');
+        g.addColorStop(1, 'transparent');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(0, 0, Math.max(0, centralSize + Math.sin(time * 0.02) * 20 * growthFactor), 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        if (settings.rings) {
+            const ringCount = Math.min(5, 3 + Math.floor(complexity));
+            for (let ring = 0; ring < ringCount; ring++) {
+                ctx.strokeStyle = pal[(ring + Math.floor(time * 0.005)) % pal.length] + '33';
+                ctx.lineWidth = 2 + complexity;
+                ctx.beginPath();
+                const base = (120 + ring * 60) * growthFactor * (R / 200);
+                const rr = Math.max(0, base + Math.sin(time * 0.01 + ring) * 30 * energy * growthFactor);
+                ctx.arc(cx, cy, rr, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+        }
+    }
+
+    function animate() {
+        drawKaleidoscope();
+
+        if (!paused) {
+            const s = settings.speed;
+            growthFactor = Math.min(3, Math.max(growthFactor, 0.1 + time * 0.0005));
+            complexity = Math.min(2, time * 0.0003);
+
+            if (frame % 300 === 0 && patterns.length < settings.density + 170 + complexity * 100) {
+                patterns.push(makePattern({
+                    size: Math.random() * (3 + complexity * 2) + 1,
+                    speed: 0.005 + Math.random() * (0.01 + complexity * 0.01),
+                    pulseRate: 0.01 + Math.random() * (0.02 + complexity * 0.01),
+                    morphIntensity: 0.2 + Math.random() * (0.5 + complexity * 0.5)
+                }));
+            }
+
+            for (const p of patterns) {
+                const age = time - p.birthTime;
+                p.speed = Math.min(0.03, p.speed + age * 0.000001 * s);
+                p.morphIntensity = Math.min(2, p.morphIntensity + age * 0.000002 * s);
+                if (p.life !== undefined) {
+                    p.life -= s;
+                }
+            }
+            for (let i = patterns.length - 1; i >= 0; i--) {
+                if (patterns[i].life !== undefined && patterns[i].life <= 0) patterns.splice(i, 1);
+            }
+            if (patterns.length > 300) patterns.splice(0, patterns.length - 200);
+
+            energy = Math.max(0.3, energy * Math.pow(0.99, s));
+            if (settings.spin) spinAngle += 0.002 * s;
+            time += s;
+            frame += 1;
+        }
+        requestAnimationFrame(animate);
+    }
+
+    function burst(atX, atY) {
+        energy = Math.min(3, energy + 1);
+        if (atX !== undefined) { mouseX = atX; mouseY = atY; }
+        const count = Math.min(15, 5 + Math.floor(complexity * 5));
+        for (let i = 0; i < count; i++) {
+            patterns.push(makePattern({
+                size: Math.random() * (8 + complexity * 4) + 2,
+                speed: (0.01 + Math.random() * 0.02) * (1 + complexity * 0.5),
+                pulseRate: (0.02 + Math.random() * 0.03) * (1 + complexity * 0.3),
+                morphIntensity: (0.5 + Math.random() * 1.5) * (1 + complexity * 0.4),
+                life: 80 + complexity * 20 // in ~1/10 time units below
+            }));
+            patterns[patterns.length - 1].life *= 10;
+        }
+        growthFactor = Math.min(3, growthFactor + 0.05);
+    }
+
+    function reset() {
+        patterns.length = 0;
+        time = 0; frame = 0; energy = 1; growthFactor = 0.1; complexity = 0; spinAngle = 0;
+        initPatterns();
+    }
+
+    // ---------- Pointer ----------
+    function toCanvas(e) {
+        const r = canvas.getBoundingClientRect();
+        return { x: (e.clientX - r.left) * (canvas.width / r.width), y: (e.clientY - r.top) * (canvas.height / r.height) };
+    }
+    canvas.addEventListener('pointermove', (e) => { const p = toCanvas(e); mouseX = p.x; mouseY = p.y; });
+    canvas.addEventListener('click', (e) => { const p = toCanvas(e); burst(p.x, p.y); });
+
+    // ---------- Panel wiring ----------
+    const $ = (id) => document.getElementById(id);
+
+    function setMode(m) {
+        settings.mode = m;
+        document.querySelectorAll('#modeSeg button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.mode === m)));
+        save();
+    }
+    document.querySelectorAll('#modeSeg button').forEach(b => b.addEventListener('click', () => setMode(+b.dataset.mode)));
+
+    function bindRange(id, key, fmt, onChange) {
+        const input = $(id), out = $(id + 'Out');
+        input.value = settings[key];
+        out.textContent = fmt(settings[key]);
+        input.addEventListener('input', () => {
+            settings[key] = parseFloat(input.value);
+            out.textContent = fmt(settings[key]);
+            if (onChange) onChange();
+            save();
+        });
+    }
+    bindRange('segments', 'segments', v => String(v));
+    bindRange('speed', 'speed', v => v.toFixed(1) + '×');
+    bindRange('radius', 'radius', v => String(v));
+    bindRange('density', 'density', v => String(v), () => {
+        const base = patterns.filter(p => p.life === undefined);
+        if (base.length < settings.density) {
+            for (let i = base.length; i < settings.density; i++) patterns.push(makePattern());
+        } else {
+            let extra = base.length - settings.density;
+            for (let i = patterns.length - 1; i >= 0 && extra > 0; i--) {
+                if (patterns[i].life === undefined) { patterns.splice(i, 1); extra--; }
+            }
+        }
+    });
+
+    const palWrap = $('palettes');
+    Object.entries(PALETTES).forEach(([name, cols], idx) => {
+        const b = document.createElement('button');
+        b.className = 'pal';
+        b.id = 'pal' + idx;
+        b.setAttribute('aria-pressed', String(name === settings.palette));
+        b.innerHTML = '<span class="swatch">' + cols.slice(0, 6).map(c => '<i style="background:' + c + '"></i>').join('') + '</span>' + name;
+        b.addEventListener('click', () => {
+            settings.palette = name;
+            palWrap.querySelectorAll('.pal').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+            save();
+        });
+        palWrap.appendChild(b);
+    });
+
+    document.querySelectorAll('#shapeChips .chip').forEach(chip => {
+        const i = +chip.dataset.shape;
+        chip.setAttribute('aria-pressed', String(settings.shapes[i]));
+        chip.addEventListener('click', () => {
+            const on = !settings.shapes[i];
+            if (!on && settings.shapes.filter(Boolean).length === 1) return; // keep at least one
+            settings.shapes[i] = on;
+            chip.setAttribute('aria-pressed', String(on));
+            if (on) {
+                // give newly enabled shapes some presence
+                patterns.forEach(p => { if (Math.random() < 0.25) p.shape = i; });
+            }
+            save();
+        });
+    });
+
+    ['trails', 'rings', 'spin'].forEach(key => {
+        const box = $(key);
+        box.checked = settings[key];
+        box.addEventListener('change', () => { settings[key] = box.checked; save(); });
+    });
+
+    const pauseBtn = $('pauseBtn');
+    function togglePause() { paused = !paused; pauseBtn.textContent = paused ? 'Play' : 'Pause'; }
+    pauseBtn.addEventListener('click', togglePause);
+    $('burstBtn').addEventListener('click', () => burst());
+    $('resetBtn').addEventListener('click', reset);
+
+    function setPanel(open) {
+        document.body.classList.toggle('panel-closed', !open);
+        $('openPanel').hidden = open;
+        try { localStorage.setItem('kaleido-panel', open ? '1' : '0'); } catch (e) {}
+    }
+    $('closePanel').addEventListener('click', () => setPanel(false));
+    $('openPanel').addEventListener('click', () => setPanel(true));
+    try { if (localStorage.getItem('kaleido-panel') === '0') setPanel(false); } catch (e) {}
+
+    document.addEventListener('keydown', (e) => {
+        const t = e.target;
+        const typing = t && (t.tagName === 'INPUT' || t.tagName === 'BUTTON' || t.tagName === 'TEXTAREA');
+        if (e.code === 'Space' && !typing) { setMode((settings.mode + 1) % 3); e.preventDefault(); }
+        else if (e.key === 'p' || e.key === 'P') togglePause();
+        else if (e.key === 'h' || e.key === 'H') setPanel(document.body.classList.contains('panel-closed'));
+    });
+
+    setMode(settings.mode);
+    initPatterns();
+    animate();
+</script>
+</body>
+</html>
