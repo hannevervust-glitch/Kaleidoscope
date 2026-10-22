@@ -132,7 +132,7 @@
             <div class="meter">Bright<span><i id="mBright"></i></span></div>
         </div>
         <div class="readout"><span id="bpmOut">– BPM</span><span id="sectionOut">no sound yet</span></div>
-        <p class="msg" id="soundMsg">Without sound it breathes on its own. Choose the microphone or load a song or DJ set.</p>
+        <p class="msg" id="soundMsg">Without sound it sleeps. Choose the microphone or load a song or DJ set to wake it up.</p>
     </div>
 
     <div class="section">
@@ -412,11 +412,15 @@
         const t = (M.t += dt);
         const k = lerp(26, 5, S.smooth), d = 2 * Math.sqrt(k) * lerp(0.8, 1.05, S.smooth);
 
+        // Sleep: with no sound (or near-silence) it slowly settles, dims and almost stops
+        const hearing = F.active && F.rms > 0.015;
+        M.awake = env(M.awake == null ? 0 : M.awake, hearing ? 1 : 0, 0.35, 3.5, dt);
+        const aw = M.awake;
+
         // Without sound: a calm autonomous breath (8 s cycle) and an occasional soft bloom
         let bass = F.bass * S.bassSens, kickEv = F.kickEvent * S.bassSens, percEv = F.percEvent * S.percSens;
         if (!F.active) {
-            bass = 0.18 + 0.12 * Math.sin(t * Math.PI * 2 / 8);
-            if (Math.floor(t / 2.6) !== Math.floor((t - dt) / 2.6)) kickEv = 0.35;
+            bass = 0;
         }
 
         // ---- slow: drop bloom (bigger drop → bigger), build tension, palette and symmetry shifts
@@ -441,7 +445,8 @@
         const breathe = F.active && F.beatConf > 0.35 && s < 0.85
             ? 0.025 * (1 - s) * Math.pow(Math.sin(F.beatPhase * Math.PI), 2)       // locked to the tempo (structure)
             : 0.02 * noise1(t * 0.3, 3);
-        const scaleTarget = 1 + clamp(bass, 0, 1.2) * 0.12 * I + M.dropBloom * 0.4 + F.build * 0.05 * I + F.contour * 0.04 + breathe;
+        const sleepBreath = 0.012 * Math.sin(t * Math.PI * 2 / 12);   // a very slow, faint breath while asleep
+        const scaleTarget = lerp(0.9 + sleepBreath, 1 + clamp(bass, 0, 1.2) * 0.12 * I + M.dropBloom * 0.4 + F.build * 0.05 * I + F.contour * 0.04 + breathe, aw);
         [M.scale, M.scaleV] = spring(M.scale, M.scaleV, scaleTarget, k * 0.6, d * 0.8, dt);
         M.scale = clamp(M.scale, 0.75, 1.65);
 
@@ -458,7 +463,7 @@
 
         // ---- rotation: slow base, mids add drive, inertia carries it, direction changes are rare
         if (s > 0.2 && t - M.lastFlip > 20 && rnd() < dt * 0.02 * s) { M.dir *= -1; M.lastFlip = t; }
-        const rotTarget = S.rotation * (0.05 + 0.22 * F.mid * I + 0.04 * noise1(t * 0.1, 7) * (0.5 + s)) * M.dir;
+        const rotTarget = S.rotation * (0.05 + 0.22 * F.mid * I + 0.04 * noise1(t * 0.1, 7) * (0.5 + s)) * M.dir * (0.03 + 0.97 * aw);
         M.rotV = env(M.rotV, rotTarget, lerp(0.6, 2.5, S.smooth), lerp(1, 4, S.smooth), dt);
         if (percEv) M.rotV += (rnd() < 0.5 && s > 0.3 ? -1 : 1) * M.dir * 0.03 * percEv * S.rotation;  // small angular nudge
         M.rot += M.rotV * dt;
@@ -478,20 +483,21 @@
         // ---- population follows the overall energy (thinner in breakdowns, fuller in drops)
         const target = Math.round(clamp(40 + 80 * (F.active ? clamp(stats.rmsL * 3, 0, 1) : 0.2) * I + 40 * M.dropBloom, 30, 170) * Q.pop);
         const living = blooms.filter(b => !b.dying).length;
-        if (living < target && rnd() < dt * 5) addBloom();
+        if (living < target && rnd() < dt * 5 * aw) addBloom();
         if (living > target + 12) { const b = blooms.find(x => !x.dying); if (b) { b.dying = true; b.dieAt = M.t; } }
 
         // ---- the original's gentle morph, but with accumulated phases so energy changes never jolt it
         M.energy = env(M.energy || 0.5, 0.3 + clamp(bass * I * 0.9, 0, 1.6) + M.dropBloom * 0.5, 0.15, lerp(0.6, 2, S.smooth), dt);
-        const tick = 30 * dt * (0.6 + 0.6 * I);         // half the original pace
+        const tick = 30 * dt * (0.6 + 0.6 * I) * (0.04 + 0.96 * aw);   // half the original pace; nearly still while asleep
         for (let i = blooms.length - 1; i >= 0; i--) {
             const b = blooms[i];
             b.acc += b.sp * tick;
             b.racc += b.sp * tick * M.energy * (0.4 + 0.6 * S.rotation);
+            if (aw < 0.5) { b.born += dt * (1 - aw); if (b.dying) b.dieAt += dt * (1 - aw); }  // time stands still while it sleeps
             const age = M.t - b.born;
             if (age > b.life + b.fade || (b.dying && M.t - b.dieAt > b.fade)) blooms.splice(i, 1);
         }
-        M.glow = env(M.glow, F.kick * 0.6 + M.dropBloom * 0.4, 0.05, 0.6, dt);
+        M.glow = env(M.glow, (F.kick * 0.6 + M.dropBloom * 0.4) * aw, 0.05, 0.6, dt);
     }
 
     // =====================================================================
@@ -598,8 +604,10 @@
         const k = (R / (WEDGE * 0.55)) * (0.88 + 0.12 * M.scale);   // the mandala itself fills the window
 
         if (S.depth) drawSlices(cx, cy, k * 1.5, M.segCur, M.backRot, 0.16, Q.backEvery);
-        if (M.segFade < 1) drawSlices(cx, cy, k, M.segPrev, M.rot, 1 - M.segFade, 1);
-        drawSlices(cx, cy, k, M.segCur, M.rot, M.segFade < 1 ? M.segFade : 1, 1);
+        const dim = 0.5 + 0.5 * (M.awake == null ? 0 : M.awake);
+        if (M.segFade < 1) drawSlices(cx, cy, k, M.segPrev, M.rot, (1 - M.segFade) * dim, 1);
+        drawSlices(cx, cy, k, M.segCur, M.rot, (M.segFade < 1 ? M.segFade : 1) * dim, 1);
+        ctx.globalAlpha = dim;
 
         // The original's glowing centre and energy rings
         const pal = palette();
@@ -622,6 +630,7 @@
             }
         }
         ctx.restore();
+        ctx.globalAlpha = 1;
     }
 
     // =====================================================================
@@ -670,7 +679,7 @@
         A.el = null; $('trackRow').hidden = true; $('progress').hidden = true;
     }
     $('micBtn').addEventListener('click', async () => {
-        if (A.mic) { stopMic(); msg('Microphone off. It breathes on its own again.'); return; }
+        if (A.mic) { stopMic(); msg('Microphone off. It falls asleep until it hears sound again.'); return; }
         stopTrack();
         try {
             ensureCtx();
@@ -727,7 +736,7 @@
         if (A.el && A.el.duration) $('progressBar').style.width = (100 * A.el.currentTime / A.el.duration) + '%';
         if (++meterTick % 15 === 0) {
             $('bpmOut').textContent = F.active && F.beatConf > 0.35 ? F.bpm + ' BPM' : '– BPM';
-            $('sectionOut').textContent = F.active ? SECTION_NAMES[F.section] : 'breathing on its own';
+            $('sectionOut').textContent = (M.awake || 0) < 0.3 ? 'asleep' : F.active ? SECTION_NAMES[F.section] : 'falling asleep';
         }
     }
 
