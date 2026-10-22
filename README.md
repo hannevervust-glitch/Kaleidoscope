@@ -2,7 +2,7 @@
 
 A morphing, interactive kaleidoscope that grows and changes over time.
 
-**Live:** https://hannevervust-glitch.github.io/kaleidoscope/
+**Live:** https://hannevervust-glitch.github.io/Kaleidoscope/
 
 ## How to use
 
