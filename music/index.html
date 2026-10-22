@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600&family=DM+Mono:wght@400&display=swap">
 <style>
-    /* Layout: full-screen canvas stage with a glass control panel docked right (bottom sheet on phones) */
+    /* Layout: full-window kaleidoscope behind a glass control panel docked right (bottom sheet on phones) */
     :root {
         --bg: #000;
         --fg: #f6eef4;
@@ -25,159 +25,100 @@
     }
     html, body { height: 100%; }
     body {
-        margin: 0;
-        padding-block: 0;
+        margin: 0; padding-block: 0;
         padding-left: max(16px, env(safe-area-inset-left, 0px));
         padding-right: max(16px, env(safe-area-inset-right, 0px));
-        background: var(--bg);
-        color: var(--fg);
-        font-family: var(--font-ui);
-        overflow: hidden;
-        box-sizing: border-box;
+        background: var(--bg); color: var(--fg); font-family: var(--font-ui);
+        overflow: hidden; box-sizing: border-box;
     }
-    .stage {
-        height: 100%;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        padding-right: 300px;
-        box-sizing: border-box;
-        transition: padding-right .25s ease;
-    }
-    body.panel-closed .stage { padding-right: 0; }
-    canvas {
-        border-radius: 10px;
-        box-shadow: 0 0 50px rgba(255, 100, 150, 0.3);
-        max-width: 100%;
-        max-height: 100%;
-        height: auto;
-        touch-action: none;
-        cursor: crosshair;
-    }
+    canvas#kc { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: pointer; }
 
     .panel {
         position: fixed;
         top: calc(16px + env(safe-area-inset-top, 0px));
         right: calc(16px + env(safe-area-inset-right, 0px));
         bottom: calc(16px + env(safe-area-inset-bottom, 0px));
-        width: 268px;
-        overflow-y: auto;
+        width: 276px; overflow-y: auto;
         background: var(--panel);
-        backdrop-filter: blur(14px);
-        -webkit-backdrop-filter: blur(14px);
-        border: 1px solid var(--line);
-        border-radius: 14px;
-        padding: 16px;
-        box-sizing: border-box;
-        display: flex;
-        flex-direction: column;
-        gap: 18px;
+        backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+        border: 1px solid var(--line); border-radius: 14px;
+        padding: 16px; box-sizing: border-box;
+        display: flex; flex-direction: column; gap: 16px;
         transition: transform .25s ease, opacity .25s ease;
     }
     body.panel-closed .panel { transform: translateX(110%); opacity: 0; pointer-events: none; }
-
     .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-    .panel-head h1 { font-size: 15px; font-weight: 600; margin: 0; letter-spacing: .01em; }
-    .hint { font-size: 11.5px; color: var(--muted); line-height: 1.5; margin: -8px 0 0; }
-
-    .group { display: flex; flex-direction: column; gap: 8px; }
-    .label {
-        font-size: 10.5px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted);
-        display: flex; justify-content: space-between; align-items: baseline;
-    }
+    .panel-head h1 { font-size: 15px; font-weight: 600; margin: 0; }
+    .hint { font-size: 11.5px; color: var(--muted); line-height: 1.5; margin: -6px 0 0; }
+    .section { display: flex; flex-direction: column; gap: 10px; padding-top: 14px; border-top: 1px solid var(--line); }
+    .section h2 { margin: 0; font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .14em; color: var(--accent); }
+    .group { display: flex; flex-direction: column; gap: 6px; }
+    .label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
     .label output { font-family: var(--font-data); font-size: 12px; color: var(--fg); letter-spacing: 0; text-transform: none; }
-
-    .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
-    .chips { display: flex; flex-wrap: wrap; gap: 6px; }
-    .btn, .chip, .seg button {
+    .ends { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--muted); margin-top: -2px; }
+    input[type="range"] { width: 100%; accent-color: var(--accent); margin: 0; }
+    .btn, .chip {
         font: inherit; font-size: 12.5px; color: var(--fg);
         background: transparent; border: 1px solid var(--line); border-radius: 8px;
-        padding: 7px 8px; cursor: pointer;
-        transition: background .15s, border-color .15s, color .15s;
+        padding: 7px 8px; cursor: pointer; transition: background .15s, border-color .15s;
     }
-    .btn:hover, .chip:hover, .seg button:hover { border-color: var(--accent); }
-    .seg button[aria-pressed="true"], .chip[aria-pressed="true"] {
-        background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600;
-    }
+    .btn:hover, .chip:hover { border-color: var(--accent); }
+    .btn[aria-pressed="true"], .chip[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+    .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
     .chip { border-radius: 999px; padding: 5px 11px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; }
     :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-
-    input[type="range"] { width: 100%; accent-color: var(--accent); margin: 0; }
-
-    .palettes { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-    .pal {
-        font: inherit; font-size: 11.5px; color: var(--fg); text-align: left;
-        background: transparent; border: 1px solid var(--line); border-radius: 8px;
-        padding: 6px; cursor: pointer; display: flex; flex-direction: column; gap: 5px;
-    }
-    .pal[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
-    .swatch { display: flex; height: 10px; border-radius: 3px; overflow: hidden; }
-    .swatch i { flex: 1; }
-
-    .toggle { display: flex; align-items: center; justify-content: space-between; font-size: 12.5px; cursor: pointer; }
-    .toggle input { accent-color: var(--accent); width: 16px; height: 16px; }
-
-    .sound { display: flex; flex-direction: column; gap: 10px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
-    .src-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .row3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
     .file-btn { position: relative; overflow: hidden; text-align: center; }
     .file-btn input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
     .file-btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
-    .btn[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
     .track { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); min-width: 0; }
     .track .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .progress { width: 100%; height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; cursor: pointer; }
     .progress i { display: block; height: 100%; width: 0; background: var(--accent); }
-    .meters { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
-    .meter { display: flex; flex-direction: column; gap: 4px; font-size: 10.5px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); }
-    .meter span { display: block; height: 30px; background: rgba(255,255,255,.06); border-radius: 4px; position: relative; overflow: hidden; }
+    .meters { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+    .meter { display: flex; flex-direction: column; gap: 4px; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+    .meter span { display: block; height: 28px; background: rgba(255,255,255,.06); border-radius: 4px; position: relative; overflow: hidden; }
     .meter span i { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: var(--accent); border-radius: 4px; }
-    .sound-msg { font-size: 11.5px; color: var(--muted); line-height: 1.45; margin: 0; min-height: 1em; }
-    .sound-msg.error { color: #ff9b9b; }
-
-    .actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: auto; }
-    .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
-
+    .readout { display: flex; justify-content: space-between; font-family: var(--font-data); font-size: 12px; color: var(--fg); }
+    .readout span:last-child { color: var(--accent); }
+    .msg { font-size: 11.5px; color: var(--muted); line-height: 1.45; margin: 0; min-height: 1em; }
+    .msg.error { color: #ff9b9b; }
+    .toggle { display: flex; align-items: center; justify-content: space-between; font-size: 12.5px; cursor: pointer; gap: 8px; }
+    .toggle input { accent-color: var(--accent); width: 16px; height: 16px; flex: none; }
+    .palettes { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .pal { font: inherit; font-size: 11.5px; color: var(--fg); text-align: left; background: transparent; border: 1px solid var(--line); border-radius: 8px; padding: 6px; cursor: pointer; display: flex; flex-direction: column; gap: 5px; }
+    .pal[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+    .swatch { display: flex; height: 10px; border-radius: 3px; overflow: hidden; }
+    .swatch i { flex: 1; }
     .open-btn {
-        position: fixed;
-        top: calc(16px + env(safe-area-inset-top, 0px));
-        right: calc(16px + env(safe-area-inset-right, 0px));
+        position: fixed; top: calc(16px + env(safe-area-inset-top, 0px)); right: calc(16px + env(safe-area-inset-right, 0px));
         background: var(--panel); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
     }
-    .close-btn { padding: 4px 10px; }
-
     @media (max-width: 720px) {
-        .stage { padding-right: 0; padding-bottom: 46vh; }
-        body.panel-closed .stage { padding-bottom: 0; }
-        .panel {
-            top: auto; left: calc(8px + env(safe-area-inset-left, 0px)); right: calc(8px + env(safe-area-inset-right, 0px));
-            bottom: calc(8px + env(safe-area-inset-bottom, 0px));
-            width: auto; max-height: 44vh;
-        }
+        .panel { top: auto; left: calc(8px + env(safe-area-inset-left, 0px)); right: calc(8px + env(safe-area-inset-right, 0px)); bottom: calc(8px + env(safe-area-inset-bottom, 0px)); width: auto; max-height: 46vh; }
         body.panel-closed .panel { transform: translateY(110%); }
     }
-    @media (prefers-reduced-motion: reduce) {
-        .panel, .stage { transition: none; }
-    }
+    @media (prefers-reduced-motion: reduce) { .panel { transition: none; } }
 </style>
 </head>
 <body>
-<div class="stage">
-    <canvas id="kaleidoscopeCanvas" aria-label="Animated kaleidoscope. Click to add energy waves."></canvas>
-</div>
-
+<canvas id="kc" aria-label="Kaleidoscope that blooms with the music. Click for a bloom."></canvas>
 <button class="btn open-btn" id="openPanel" hidden>Options</button>
 
-<aside class="panel" id="panel" aria-label="Kaleidoscope options">
+<aside class="panel" id="panel" aria-label="Kaleidoscope music options">
     <div class="panel-head">
         <h1>Kaleidoscope · Music</h1>
-        <button class="btn close-btn" id="closePanel" aria-label="Hide options">Hide</button>
+        <button class="btn" id="closePanel" aria-label="Hide options">Hide</button>
     </div>
-    <p class="hint">Play music and the kaleidoscope dances with it. Space switches mode, F goes fullscreen, H hides this panel.</p>
+    <p class="hint">Play music and the kaleidoscope blooms with it. Click for a bloom. F fullscreen, H hides this panel, N new variation.</p>
 
-    <div class="sound">
-        <div class="src-row">
+    <div class="section" style="border-top:0;padding-top:0">
+        <h2>Sound</h2>
+        <div class="row2">
             <button class="btn" id="micBtn" type="button" aria-pressed="false">Microphone</button>
-            <label class="btn file-btn" id="fileLabel" for="trackInput">Load a track<input type="file" id="trackInput" accept="audio/*"></label>
+            <label class="btn file-btn" for="trackInput">Load a track<input type="file" id="trackInput" accept="audio/*"></label>
         </div>
         <div class="track" id="trackRow" hidden>
             <button class="btn" id="playBtn" type="button">Pause</button>
@@ -186,672 +127,677 @@
         <div class="progress" id="progress" hidden><i id="progressBar"></i></div>
         <div class="meters" aria-hidden="true">
             <div class="meter">Bass<span><i id="mBass"></i></span></div>
-            <div class="meter">Mids<span><i id="mMid"></i></span></div>
-            <div class="meter">Highs<span><i id="mHigh"></i></span></div>
+            <div class="meter">Kick<span><i id="mKick"></i></span></div>
+            <div class="meter">Perc<span><i id="mPerc"></i></span></div>
+            <div class="meter">Bright<span><i id="mBright"></i></span></div>
         </div>
-        <p class="sound-msg" id="soundMsg">Choose the microphone to react to the room, or load a song or DJ set from your computer.</p>
-        <label class="label" for="sens">Sensitivity <output id="sensOut">1.0×</output></label>
-        <input type="range" id="sens" min="0.3" max="3" step="0.1" value="1">
-        <label class="toggle" for="aPulse">Pulse with the bass <input type="checkbox" id="aPulse" checked></label>
-        <label class="toggle" for="aBeats">Bursts on the beat <input type="checkbox" id="aBeats" checked></label>
-        <label class="toggle" for="aSparkle">Sparkle with the highs <input type="checkbox" id="aSparkle" checked></label>
-        <label class="toggle" for="aSpin">Speed up with the mids <input type="checkbox" id="aSpin" checked></label>
-        <label class="toggle" for="aDrops">Change mode on big drops <input type="checkbox" id="aDrops"></label>
-        <button class="btn" id="fsBtn" type="button">Fullscreen</button>
+        <div class="readout"><span id="bpmOut">– BPM</span><span id="sectionOut">no sound yet</span></div>
+        <p class="msg" id="soundMsg">Without sound it breathes on its own. Choose the microphone or load a song or DJ set.</p>
     </div>
 
-    <div class="group">
-        <span class="label">Morph mode</span>
-        <div class="seg" id="modeSeg">
-            <button id="mode0" data-mode="0" aria-pressed="true">Wave</button>
-            <button id="mode1" data-mode="1" aria-pressed="false">Spiral</button>
-            <button id="mode2" data-mode="2" aria-pressed="false">Explode</button>
+    <div class="section">
+        <h2>Feel</h2>
+        <div class="group">
+            <label class="label" for="surprise">Structure ↔ surprise <output id="surpriseOut"></output></label>
+            <input type="range" id="surprise" min="0" max="1" step="0.01">
+            <div class="ends"><span>follows the music</span><span>more random</span></div>
         </div>
+        <div class="group"><label class="label" for="intensity">Movement <output id="intensityOut"></output></label><input type="range" id="intensity" min="0.2" max="2" step="0.05"></div>
+        <div class="group"><label class="label" for="bloom">Drop bloom <output id="bloomOut"></output></label><input type="range" id="bloom" min="0" max="2" step="0.05"></div>
+        <div class="group"><label class="label" for="bassSens">Bass sensitivity <output id="bassSensOut"></output></label><input type="range" id="bassSens" min="0" max="2.5" step="0.05"></div>
+        <div class="group"><label class="label" for="percSens">Percussion sensitivity <output id="percSensOut"></output></label><input type="range" id="percSens" min="0" max="2.5" step="0.05"></div>
+        <div class="group"><label class="label" for="rotation">Rotation <output id="rotationOut"></output></label><input type="range" id="rotation" min="0" max="2" step="0.05"></div>
+        <div class="group"><label class="label" for="distortion">Organic distortion <output id="distortionOut"></output></label><input type="range" id="distortion" min="0" max="1" step="0.01"></div>
+        <div class="group"><label class="label" for="smooth">Smoothness <output id="smoothOut"></output></label><input type="range" id="smooth" min="0" max="1" step="0.01"></div>
+        <div class="group"><label class="label" for="trails">Trails <output id="trailsOut"></output></label><input type="range" id="trails" min="0" max="0.92" step="0.01"></div>
+        <label class="toggle" for="symmetry">New symmetry at new sections <input type="checkbox" id="symmetry"></label>
+        <button class="btn" id="variationBtn" type="button">New variation</button>
     </div>
 
-    <div class="group">
-        <label class="label" for="segments">Mirrors <output id="segmentsOut">12</output></label>
-        <input type="range" id="segments" min="4" max="32" step="2" value="12">
-    </div>
-
-    <div class="group">
-        <label class="label" for="speed">Speed <output id="speedOut">1.0×</output></label>
-        <input type="range" id="speed" min="0.1" max="3" step="0.1" value="1">
-    </div>
-
-    <div class="group">
-        <label class="label" for="radius">Size <output id="radiusOut">200</output></label>
-        <input type="range" id="radius" min="120" max="340" step="10" value="200">
-    </div>
-
-    <div class="group">
-        <label class="label" for="density">Density <output id="densityOut">30</output></label>
-        <input type="range" id="density" min="10" max="200" step="10" value="30">
-    </div>
-
-    <div class="group">
+    <div class="section">
+        <h2>Look</h2>
+        <div class="group"><label class="label" for="size">Size <output id="sizeOut"></output></label><input type="range" id="size" min="0.6" max="1.4" step="0.01"></div>
+        <div class="group"><label class="label" for="mirrors">Mirrors <output id="mirrorsOut"></output></label><input type="range" id="mirrors" min="4" max="20" step="2"></div>
         <span class="label">Palette</span>
         <div class="palettes" id="palettes"></div>
-    </div>
-
-    <div class="group">
         <span class="label">Shapes</span>
         <div class="chips" id="shapeChips">
-            <button class="chip" id="shape0" data-shape="0" aria-pressed="true">Circles</button>
-            <button class="chip" id="shape1" data-shape="1" aria-pressed="true">Stars</button>
-            <button class="chip" id="shape2" data-shape="2" aria-pressed="true">Diamonds</button>
-            <button class="chip" id="shape3" data-shape="3" aria-pressed="true">Flowers</button>
+            <button class="chip" id="shape0" data-shape="0">Circles</button>
+            <button class="chip" id="shape1" data-shape="1">Stars</button>
+            <button class="chip" id="shape2" data-shape="2">Diamonds</button>
+            <button class="chip" id="shape3" data-shape="3">Flowers</button>
         </div>
+        <label class="toggle" for="rings">Energy rings <input type="checkbox" id="rings"></label>
+        <label class="toggle" for="depth">Depth layer <input type="checkbox" id="depth"></label>
     </div>
 
-    <div class="group">
-        <label class="toggle" for="trails">Light trails <input type="checkbox" id="trails"></label>
-        <label class="toggle" for="rings">Energy rings <input type="checkbox" id="rings" checked></label>
-        <label class="toggle" for="spin">Slow rotation <input type="checkbox" id="spin"></label>
-    </div>
-
-    <div class="actions">
-        <button class="btn" id="pauseBtn">Pause</button>
-        <button class="btn primary" id="burstBtn">Burst</button>
-        <button class="btn" id="resetBtn">Reset</button>
+    <div class="row3">
+        <button class="btn" id="pauseBtn" type="button">Pause</button>
+        <button class="btn primary" id="bloomBtn" type="button">Bloom</button>
+        <button class="btn" id="fsBtn" type="button">Full</button>
     </div>
 </aside>
 
 <script>
-    const canvas = document.getElementById('kaleidoscopeCanvas');
+(() => {
+    const $ = (id) => document.getElementById(id);
+    const canvas = $('kc');
     const ctx = canvas.getContext('2d');
-    canvas.width = 900;
-    canvas.height = 700;
 
-    // ---------- Palettes ----------
+    // =====================================================================
+    // Settings (remembered in this browser)
+    // =====================================================================
+    const DEFAULTS = {
+        surprise: 0.35, intensity: 1, bloom: 1, bassSens: 1, percSens: 1, rotation: 0.6,
+        distortion: 0.3, smooth: 0.6, trails: 0.25, symmetry: true,
+        size: 1, mirrors: 12, palette: 'Neon', shapes: [true, true, true, true], rings: true, depth: true, seed: 1
+    };
+    let S = { ...DEFAULTS };
+    try { const v = JSON.parse(localStorage.getItem('kaleido-music-v2') || 'null'); if (v && typeof v === 'object') S = { ...DEFAULTS, ...v }; } catch (e) {}
+    const save = () => { try { localStorage.setItem('kaleido-music-v2', JSON.stringify(S)); } catch (e) {} };
+
     const PALETTES = {
         'Neon': ['#FF1493','#FF69B4','#FF6347','#FFD700','#FFA500','#00CED1','#32CD32','#9370DB','#DC143C','#FF4500','#00FF7F','#1E90FF','#8A2BE2','#00FA9A','#FF8C00','#DA70D6','#40E0D0'],
         'Sunset': ['#FF5E5B','#FF9F1C','#FFBF69','#FFD166','#F15BB5','#C0392B','#FF7B54','#FFB26B','#E85D75','#FDCB6E'],
         'Groovy 70s': ['#E76F51','#F4A261','#E9C46A','#2A9D8F','#D62828','#F77F00','#FCBF49','#BC6C25','#DDA15E','#B5838D'],
-        'Ocean': ['#03045E','#0077B6','#00B4D8','#90E0EF','#CAF0F8','#48CAE4','#00F5D4','#4361EE','#7209B7','#4CC9F0'],
+        'Ocean': ['#0077B6','#00B4D8','#90E0EF','#CAF0F8','#48CAE4','#00F5D4','#4361EE','#7209B7','#4CC9F0','#3A86FF'],
         'Forest': ['#2D6A4F','#40916C','#52B788','#74C69D','#B7E4C7','#D8F3DC','#95D5B2','#ADC178','#DDE5B6','#A98467'],
         'Pastel': ['#FFADAD','#FFD6A5','#FDFFB6','#CAFFBF','#9BF6FF','#A0C4FF','#BDB2FF','#FFC6FF'],
-        'Gemstone': ['#9B1D20','#3D2B56','#0B6E4F','#1D3557','#E0B1CB','#7B2CBF','#C9184A','#118AB2','#F4D35E','#5E548E'],
+        'Gemstone': ['#C9184A','#7B2CBF','#0B6E4F','#118AB2','#E0B1CB','#F4D35E','#9B1D20','#5E548E','#3A86FF','#06D6A0'],
         'Moonlight': ['#FFFFFF','#E0E1DD','#C9D6DF','#A9B4C2','#778DA9','#D8E2DC','#F1FAEE','#BFC0C0']
     };
+    if (!PALETTES[S.palette]) S.palette = 'Neon';
 
-    // ---------- Settings (remembered per viewer when possible) ----------
-    const defaults = {
-        mode: 0, segments: 12, speed: 1, radius: 200, density: 30,
-        palette: 'Neon', shapes: [true, true, true, true],
-        trails: false, rings: true, spin: false
+    // Seeded randomness, so "New variation" gives a new but repeatable character
+    let rngState = 1;
+    function reseed(seed) { rngState = (seed * 2654435761) >>> 0 || 1; }
+    function rnd() { rngState = (Math.imul(rngState, 1664525) + 1013904223) >>> 0; return rngState / 4294967296; }
+    reseed(S.seed);
+
+    const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+    const lerp = (a, b, t) => a + (b - a) * t;
+    const easeOut = (t) => 1 - Math.pow(1 - clamp(t, 0, 1), 3);
+    // Smooth value noise for organic drift (no repeating sine patterns)
+    function noise1(x, salt) {
+        const i = Math.floor(x), f = x - i;
+        const h = (n) => { let v = Math.sin((n + salt * 17.13) * 127.1) * 43758.5453; return v - Math.floor(v); };
+        const u = f * f * (3 - 2 * f);
+        return lerp(h(i), h(i + 1), u) * 2 - 1;
+    }
+
+    // =====================================================================
+    // 1. AUDIO ANALYSIS: turns sound into features. Knows nothing about visuals.
+    // =====================================================================
+    const F = {
+        active: false,
+        bass: 0, mid: 0, high: 0, rms: 0,         // smoothed band energy 0..1 (envelopes with attack/release)
+        kick: 0, perc: 0,                          // short decaying impulses from onsets 0..1+
+        kickEvent: 0, percEvent: 0,                // strength of an onset this frame (0 if none)
+        bright: 0.5, contour: 0,                   // spectral brightness 0..1 and its slow rise/fall (-1..1)
+        bpm: 0, beatConf: 0, beatPhase: 0, beatCount: 0, beatEvent: false,
+        section: 'calm', build: 0, dropEvent: 0, sectionChanged: false
     };
-    let settings = { ...defaults };
-    try {
-        const saved = JSON.parse(localStorage.getItem('kaleido-settings') || 'null');
-        if (saved && typeof saved === 'object') settings = { ...defaults, ...saved };
-        if (!PALETTES[settings.palette]) settings.palette = defaults.palette;
-    } catch (e) {}
-    function save() {
-        try { localStorage.setItem('kaleido-settings', JSON.stringify(settings)); } catch (e) {}
+    const A = { ctx: null, analyser: null, freq: null, prev: null, wave: null, mic: null, micNode: null, el: null, elNode: null, url: null };
+    const stats = {
+        lowFlux: { m: 0, v: 0, last: -1 }, highFlux: { m: 0, v: 0, last: -1 },
+        kicks: [], bassS: 0, bassL: 0, rmsS: 0, rmsL: 0, highS: 0, highL: 0, cS: 0.5, cL: 0.5,
+        sectionSince: 0, lastDrop: -99, lastCalmish: -99, anchor: 0
+    };
+
+    function env(cur, target, attack, release, dt) {
+        const tau = target > cur ? attack : release;
+        return cur + (target - cur) * (1 - Math.exp(-dt / Math.max(0.001, tau)));
+    }
+    function ema(cur, x, tau, dt) { return cur + (x - cur) * (1 - Math.exp(-dt / tau)); }
+
+    function bandAvg(lo, hi) {
+        const hz = A.ctx.sampleRate / 2 / A.freq.length;
+        const a = Math.max(1, Math.floor(lo / hz)), b = Math.min(A.freq.length - 1, Math.ceil(hi / hz));
+        let s = 0; for (let i = a; i <= b; i++) s += A.freq[i];
+        return s / ((b - a + 1) * 255);
+    }
+    function bandFlux(lo, hi) {
+        const hz = A.ctx.sampleRate / 2 / A.freq.length;
+        const a = Math.max(1, Math.floor(lo / hz)), b = Math.min(A.freq.length - 1, Math.ceil(hi / hz));
+        let s = 0; for (let i = a; i <= b; i++) { const d = A.freq[i] - A.prev[i]; if (d > 0) s += d; }
+        return s / ((b - a + 1) * 255);
+    }
+    // Onset detector with an adaptive threshold (mean + k·std of recent flux)
+    function onset(st, flux, now, refractory, k, floor) {
+        const a = 0.04;
+        const d = flux - st.m;
+        st.m += a * d; st.v += a * (d * d - st.v);
+        const thr = st.m + k * Math.sqrt(Math.max(st.v, 1e-6)) + floor;
+        if (flux > thr && now - st.last > refractory) { st.last = now; return clamp((flux - thr) / (thr + 1e-3) + 0.3, 0.2, 1.5); }
+        return 0;
+    }
+    function estimateTempo(now) {
+        const ks = stats.kicks.filter(t => now - t < 12);
+        stats.kicks = ks;
+        if (ks.length < 5) { F.beatConf = Math.max(0, F.beatConf - 0.01); return; }
+        const iv = [];
+        for (let i = 1; i < ks.length; i++) for (let j = 1; j <= 2 && i - j >= 0; j++) {
+            let d = (ks[i] - ks[i - j]) / j;
+            while (d < 0.35) d *= 2;
+            while (d > 0.75) d /= 2;
+            iv.push(d);
+        }
+        const bins = new Array(41).fill(0);          // 0.35..0.75 s in 10 ms bins
+        iv.forEach(d => { const b = Math.round((d - 0.35) * 100); if (b >= 0 && b <= 40) { bins[b] += 1; if (b > 0) bins[b - 1] += .5; if (b < 40) bins[b + 1] += .5; } });
+        let best = 0; for (let i = 1; i < bins.length; i++) if (bins[i] > bins[best]) best = i;
+        const period = 0.35 + best / 100;
+        const support = iv.filter(d => Math.abs(d - period) < period * 0.06).length / iv.length;
+        F.beatConf = ema(F.beatConf, support, 1.5, 1 / 60);
+        F.bpm = Math.round(60 / period);
+        stats.period = period;
     }
 
-    // ---------- State ----------
-    let time = 0;
-    let frame = 0;
-    let paused = false;
-    let mouseX = canvas.width / 2;
-    let mouseY = canvas.height / 2;
-    let energy = 1;
-    let growthFactor = 0.1;
-    let complexity = 0;
-    let spinAngle = 0;
-    const patterns = [];
+    function analyse(dt, now) {
+        F.kickEvent = 0; F.percEvent = 0; F.beatEvent = false; F.dropEvent = 0; F.sectionChanged = false;
+        const live = A.analyser && (A.mic || (A.el && !A.el.paused));
+        F.active = !!live;
+        if (!live) {
+            ['bass', 'mid', 'high', 'rms', 'kick', 'perc'].forEach(k => F[k] *= Math.exp(-dt * 2));
+            if (F.section !== 'calm') { F.section = 'calm'; }
+            return;
+        }
+        A.analyser.getByteFrequencyData(A.freq);
+        A.analyser.getByteTimeDomainData(A.wave);
+        let sq = 0; for (let i = 0; i < A.wave.length; i++) { const v = (A.wave[i] - 128) / 128; sq += v * v; }
+        const rms = Math.sqrt(sq / A.wave.length);
+        const bass = bandAvg(30, 150), mid = bandAvg(150, 2000), high = bandAvg(2000, 9000);
+        let num = 0, den = 0; for (let i = 2; i < A.freq.length; i++) { num += i * A.freq[i]; den += A.freq[i]; }
+        const centroid = den > 0 ? clamp((num / den) / (A.freq.length * 0.25), 0, 1) : 0;
 
-    const colors = () => PALETTES[settings.palette];
-    const colorOf = (p) => { const c = colors(); return c[p.colorIndex % c.length]; };
-    const alphaHex = (a) => Math.max(0, Math.min(255, Math.floor(a))).toString(16).padStart(2, '0');
+        // Envelopes: fast attack, slower release
+        F.bass = env(F.bass, bass, 0.04, 0.35, dt);
+        F.mid = env(F.mid, mid, 0.12, 0.6, dt);
+        F.high = env(F.high, high, 0.03, 0.2, dt);
+        F.rms = env(F.rms, rms, 0.05, 0.5, dt);
 
-    function enabledShapes() {
-        const s = [];
-        settings.shapes.forEach((on, i) => { if (on) s.push(i); });
-        return s.length ? s : [0, 1, 2, 3];
+        // Onsets: kick from low-band flux, percussion (snare / claps / hats) from high-band flux
+        const lf = bandFlux(30, 160), hf = bandFlux(2000, 10000);
+        A.prev.set(A.freq);
+        const k = onset(stats.lowFlux, lf, now, 0.22, 1.5, 0.004);
+        const p = onset(stats.highFlux, hf, now, 0.09, 1.7, 0.003);
+        if (k && bass > 0.12) { F.kickEvent = k; F.kick = Math.max(F.kick, k); stats.kicks.push(now); stats.anchor = now; }
+        if (p) { F.percEvent = p; F.perc = Math.max(F.perc, p); }
+        F.kick *= Math.exp(-dt * 6); F.perc *= Math.exp(-dt * 9);
+
+        // Tempo and beat phase (only trusted when the kicks are regular)
+        estimateTempo(now);
+        if (stats.period && F.beatConf > 0.35) {
+            const ph = ((now - stats.anchor) / stats.period) % 1;
+            if (ph < F.beatPhase) { F.beatEvent = true; F.beatCount++; }
+            F.beatPhase = ph;
+        }
+
+        // Brightness and its slow contour: a simple stand-in for melodic rise and fall
+        stats.cS = ema(stats.cS, centroid, 0.7, dt); stats.cL = ema(stats.cL, centroid, 4, dt);
+        F.bright = stats.cS;
+        F.contour = ema(F.contour, clamp((stats.cS - stats.cL) * 10, -1, 1), 0.8, dt);
+
+        // Sections: compare short and long averages
+        stats.bassS = ema(stats.bassS, bass, 0.5, dt); stats.bassL = ema(stats.bassL, bass, 9, dt);
+        stats.rmsS = ema(stats.rmsS, rms, 1, dt); stats.rmsL = ema(stats.rmsL, rms, 10, dt);
+        stats.highS = ema(stats.highS, high, 1, dt); stats.highL = ema(stats.highL, high, 8, dt);
+        const bl = Math.max(stats.bassL, 0.02);
+        let next = 'groove';
+        if (stats.rmsS < 0.025) next = 'calm';
+        else if (stats.bassS < bl * 0.55) next = 'breakdown';
+        else if ((stats.highS > stats.highL * 1.15 || stats.rmsS > stats.rmsL * 1.08) && stats.bassS < bl * 0.95) next = 'building';
+        if (next === 'breakdown' || next === 'building' || next === 'calm') stats.lastCalmish = now;
+        F.build = ema(F.build, next === 'building' ? 1 : 0, next === 'building' ? 5 : 1.5, dt);
+
+        // A drop: bass comes back hard after a calmer or building passage
+        const ratio = stats.bassS / bl;
+        if (ratio > 1.3 && now - stats.lastCalmish < 14 && now - stats.lastDrop > 10 && stats.bassS > 0.18) {
+            stats.lastDrop = now;
+            F.dropEvent = clamp((ratio - 1) * 0.9 + F.build * 0.5, 0.25, 1.6);
+            next = 'drop';
+        }
+        if (F.section === 'drop' && now - stats.lastDrop < 8 && next === 'groove') next = 'drop';
+        if (next !== F.section && now - stats.sectionSince > 2.5) { F.section = next; stats.sectionSince = now; F.sectionChanged = true; }
     }
-    function randomShape() { const s = enabledShapes(); return s[Math.floor(Math.random() * s.length)]; }
-    function segW() { return canvas.width / settings.segments; }
-    function segH() { return canvas.height / settings.segments; }
 
-    function makePattern(extra) {
-        return Object.assign({
-            x: Math.random() * segW(),
-            y: Math.random() * segH(),
-            size: Math.random() * 3 + 1,
-            colorIndex: Math.floor(Math.random() * 64),
-            shape: randomShape(),
-            rotation: Math.random() * Math.PI * 2,
-            speed: 0.005 + Math.random() * 0.01,
-            phase: Math.random() * Math.PI * 2,
-            pulseRate: 0.01 + Math.random() * 0.02,
-            morphIntensity: 0.2 + Math.random() * 0.5,
-            birthTime: time
-        }, extra || {});
+    // =====================================================================
+    // 2. MOTION SYSTEM: maps features to movement on three timescales.
+    // =====================================================================
+    // fast  = onsets: short radial kick (spring), small angular nudges, sparkles
+    // medium = groove: bass breathing, rotation speed, flow outward
+    // slow  = sections: drop bloom, build tension, symmetry and palette shifts, organic drift
+    const M = {
+        scale: 1, scaleV: 0,            // overall size (spring)
+        pulse: 0, pulseV: 0,            // inner radial bulge from kicks (underdamped spring: hits then settles)
+        rot: 0, rotV: 0, dir: 1,        // rotation with inertia
+        backRot: 0,
+        twist: 0, twistV: 0,            // angular distortion
+        flow: 0,                        // how fast blooms travel outward
+        dropBloom: 0,                   // extra size after a drop, proportional to its strength
+        segCur: S.mirrors, segPrev: S.mirrors, segFade: 1,
+        palShift: 0, glow: 0,
+        t: 0, lastSym: -99, lastFlip: 0
+    };
+
+    function spring(x, v, target, k, d, dt) {
+        const a = k * (target - x) - d * v;
+        v += a * dt; x += v * dt;
+        return [x, v];
     }
 
-    function initPatterns() {
-        for (let i = 0; i < settings.density; i++) patterns.push(makePattern());
+    // Blooms: each shape grows from nothing, travels outward, and fades
+    const blooms = [];
+    function enabledShapes() { const s = []; S.shapes.forEach((on, i) => on && s.push(i)); return s.length ? s : [0, 1, 2, 3]; }
+    function addBloom(opts) {
+        const shapes = enabledShapes();
+        blooms.push(Object.assign({
+            u: 0.08 + rnd() * 0.85,                 // radial position in the slice (0 centre, 1 rim)
+            v: (rnd() - 0.5) * 0.9,                 // across the slice
+            size: 0.6 + rnd() * 1.1,
+            shape: shapes[Math.floor(rnd() * shapes.length)],
+            ci: Math.floor(rnd() * 64),
+            rot: rnd() * Math.PI * 2,
+            spin: (rnd() - 0.5) * 0.6,
+            depth: 0.5 + rnd(),                     // how fast it drifts outward
+            salt: rnd() * 100,
+            born: M.t, grow: 1.6 + rnd() * 1.6,     // seconds to fully bloom
+            life: 14 + rnd() * 16, fade: 2.5
+        }, opts || {}));
     }
 
-    function drawShape(pattern, x, y, size, rotation) {
-        const color = colorOf(pattern);
-        ctx.save();
-        ctx.translate(x, y);
-        ctx.rotate(rotation);
+    function updateMotion(dt) {
+        const s = S.surprise, I = S.intensity;
+        const t = (M.t += dt);
+        const k = lerp(26, 5, S.smooth), d = 2 * Math.sqrt(k) * lerp(0.8, 1.05, S.smooth);
 
-        const age = time - (pattern.birthTime || 0);
-        const ageGrowth = Math.min(2, age * 0.001);
-        const finalSize = size * growthFactor * (1 + ageGrowth);
+        // Without sound: a calm autonomous breath (8 s cycle) and an occasional soft bloom
+        let bass = F.bass * S.bassSens, kickEv = F.kickEvent * S.bassSens, percEv = F.percEvent * S.percSens;
+        if (!F.active) {
+            bass = 0.18 + 0.12 * Math.sin(t * Math.PI * 2 / 8);
+            if (Math.floor(t / 2.6) !== Math.floor((t - dt) / 2.6)) kickEv = 0.35;
+        }
 
-        const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, finalSize);
-        gradient.addColorStop(0, color);
-        gradient.addColorStop(0.7, color + 'AA');
-        gradient.addColorStop(1, color + '33');
-        ctx.fillStyle = gradient;
-        ctx.beginPath();
-
-        switch (pattern.shape) {
-            case 0:
-                ctx.arc(0, 0, finalSize, 0, Math.PI * 2);
-                break;
-            case 1: {
-                const spikes = 6;
-                for (let i = 0; i < spikes * 2; i++) {
-                    const angle = (i / (spikes * 2)) * Math.PI * 2;
-                    const radius = (i % 2 === 0) ? finalSize : finalSize * 0.5;
-                    const px = Math.cos(angle) * radius, py = Math.sin(angle) * radius;
-                    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
-                }
-                ctx.closePath();
-                break;
+        // ---- slow: drop bloom (bigger drop → bigger), build tension, palette and symmetry shifts
+        if (F.dropEvent) {
+            M.dropBloom = Math.min(1.4, M.dropBloom + (0.15 + 0.55 * F.dropEvent) * S.bloom);
+            M.palShift += 3 + Math.floor(rnd() * 4);
+            const n = Math.round(8 + 10 * F.dropEvent);
+            for (let i = 0; i < n; i++) addBloom({ u: 0.04 + rnd() * 0.25, size: 1 + rnd() * 1.4 * (0.6 + F.dropEvent), grow: 2.4 + rnd() * 2, life: 10 + rnd() * 10 });
+        }
+        M.dropBloom *= Math.exp(-dt / 6);   // a drop opens up over seconds and slowly closes again
+        if (F.sectionChanged) {
+            if (S.symmetry && t - M.lastSym > 24 && (F.section === 'drop' || F.section === 'building')) {
+                const opts = [-4, -2, 2, 4].map(o => clamp(M.segCur + o, 6, 20));
+                M.segPrev = M.segCur; M.segCur = opts[Math.floor(rnd() * opts.length)]; M.segFade = 0; M.lastSym = t;
             }
-            case 2:
-                ctx.moveTo(0, -finalSize);
-                ctx.lineTo(finalSize, 0);
-                ctx.lineTo(0, finalSize);
-                ctx.lineTo(-finalSize, 0);
-                ctx.closePath();
-                break;
-            case 3: {
-                const petals = 8;
-                for (let i = 0; i < petals; i++) {
-                    const angle = (i / petals) * Math.PI * 2;
-                    const petalSize = finalSize * (0.8 + 0.4 * Math.sin(time * 0.02 + i));
-                    const px = Math.cos(angle) * petalSize, py = Math.sin(angle) * petalSize;
-                    ctx.moveTo(px * 0.5 + finalSize * 0.4, py * 0.5);
-                    ctx.arc(px * 0.5, py * 0.5, finalSize * 0.4, 0, Math.PI * 2);
-                }
-                break;
+            if (rnd() < 0.5 + 0.5 * (1 - s)) { M.dir *= -1; M.lastFlip = t; } // sections usually turn the rotation
+        }
+        if (M.segFade < 1) M.segFade = Math.min(1, M.segFade + dt / 3);
+        if (!F.sectionChanged && S.symmetry === false && M.segCur !== S.mirrors) { M.segPrev = M.segCur; M.segCur = S.mirrors; M.segFade = 0; }
+
+        // ---- medium: size breathes with sustained bass and rises with the brightness contour
+        const breathe = F.active && F.beatConf > 0.35 && s < 0.85
+            ? 0.025 * (1 - s) * Math.pow(Math.sin(F.beatPhase * Math.PI), 2)       // locked to the tempo (structure)
+            : 0.02 * noise1(t * 0.3, 3);
+        const scaleTarget = 1 + clamp(bass, 0, 1.2) * 0.12 * I + M.dropBloom * 0.4 + F.build * 0.05 * I + F.contour * 0.04 + breathe;
+        [M.scale, M.scaleV] = spring(M.scale, M.scaleV, scaleTarget, k * 0.6, d * 0.8, dt);
+        M.scale = clamp(M.scale, 0.75, 1.65);
+
+        // ---- fast: kicks bulge the structure from within, then it settles
+        if (kickEv) {
+            const accent = F.beatConf > 0.35 && F.beatCount % 4 === 0 ? 1 + 0.35 * (1 - s) : 1;  // downbeats a bit stronger
+            const variation = 1 + (rnd() - 0.5) * 1.1 * s;
+            M.pulseV += clamp(kickEv, 0, 1.5) * 1.6 * I * accent * variation;
+            const n = Math.max(1, Math.round(kickEv * (1 + 2 * s) * I));
+            for (let i = 0; i < n; i++) addBloom({ u: 0.04 + rnd() * 0.18 });
+        }
+        [M.pulse, M.pulseV] = spring(M.pulse, M.pulseV, 0, 38, lerp(4, 7, S.smooth), dt);
+        M.pulse = clamp(M.pulse, -0.15, 0.45);
+
+        // ---- rotation: slow base, mids add drive, inertia carries it, direction changes are rare
+        if (s > 0.2 && t - M.lastFlip > 20 && rnd() < dt * 0.02 * s) { M.dir *= -1; M.lastFlip = t; }
+        const rotTarget = S.rotation * (0.05 + 0.22 * F.mid * I + 0.04 * noise1(t * 0.1, 7) * (0.5 + s)) * M.dir;
+        M.rotV = env(M.rotV, rotTarget, lerp(0.6, 2.5, S.smooth), lerp(1, 4, S.smooth), dt);
+        if (percEv) M.rotV += (rnd() < 0.5 && s > 0.3 ? -1 : 1) * M.dir * 0.03 * percEv * S.rotation;  // small angular nudge
+        M.rot += M.rotV * dt;
+        M.backRot += (-M.rotV * 0.45 + 0.01 * noise1(t * 0.07, 11)) * dt;
+
+        // ---- angular distortion: slow organic bend, tightened by builds and percussion
+        const twistTarget = S.distortion * (0.5 * noise1(t * 0.15, 5) * (0.6 + s) + 0.6 * F.build + 0.4 * F.perc * S.percSens);
+        [M.twist, M.twistV] = spring(M.twist, M.twistV, twistTarget, k * 0.4, d * 0.7, dt);
+
+        // ---- flow: blooms travel outward faster when the music is full, slower in breakdowns
+        const fullness = F.active ? clamp(F.rms * 2.5, 0, 1) : 0.25;
+        M.flow = env(M.flow, (0.012 + 0.05 * fullness * I) * (F.section === 'breakdown' ? 0.4 : 1), 1.5, 3, dt);
+
+        // ---- percussion: delicate sparkles near the rim
+        if (percEv && rnd() < 0.5 * percEv) addBloom({ u: 0.55 + rnd() * 0.45, size: 0.25 + rnd() * 0.35, grow: 0.25, life: 1.2 + rnd(), fade: 0.8, shape: 1 });
+
+        // ---- population follows the overall energy (thinner in breakdowns, fuller in drops)
+        const target = Math.round(clamp(24 + 50 * (F.active ? clamp(stats.rmsL * 3, 0, 1) : 0.15) * I + 22 * M.dropBloom, 18, 100) * Q.pop);
+        const living = blooms.filter(b => !b.dying).length;
+        if (living < target && rnd() < dt * 6) addBloom();
+        if (living > target + 10) { const b = blooms.find(x => !x.dying); if (b) { b.dying = true; b.dieAt = M.t; } }
+
+        for (let i = blooms.length - 1; i >= 0; i--) {
+            const b = blooms[i];
+            b.u += M.flow * b.depth * dt;
+            b.rot += b.spin * dt * (0.4 + 0.6 * S.rotation);
+            const age = M.t - b.born;
+            if (b.u > 1.08 || age > b.life + b.fade || (b.dying && M.t - b.dieAt > b.fade)) {
+                if (!b.dying && age < b.life && b.u > 1.08) { b.u = 0.03 + rnd() * 0.06; b.born = M.t; b.v = (rnd() - 0.5) * 0.9; }  // reborn at the centre
+                else blooms.splice(i, 1);
             }
         }
-        ctx.fill();
-
-        ctx.fillStyle = color + alphaHex(102 * (1 + ageGrowth));
-        ctx.beginPath();
-        ctx.arc(0, 0, finalSize * 0.3, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
+        M.glow = env(M.glow, F.kick * 0.6 + M.dropBloom * 0.4, 0.05, 0.6, dt);
     }
 
-    function drawKaleidoscopeSegment() {
-        const sw = segW(), sh = segH();
-        const mode = settings.mode;
-        for (let p = 0; p < patterns.length; p++) {
-            const pattern = patterns[p];
-            if (!pattern || !settings.shapes[pattern.shape]) continue;
+    // =====================================================================
+    // 3. RENDERER: same neon shapes, mirrored slices, rings and glowing centre
+    // =====================================================================
+    const SPR = 96;
+    const spriteCache = new Map();
+    function sprite(shape, color) {
+        const key = shape + color;
+        if (spriteCache.has(key)) return spriteCache.get(key);
+        const cv = document.createElement('canvas'); cv.width = cv.height = SPR;
+        const c = cv.getContext('2d'); c.translate(SPR / 2, SPR / 2);
+        const r = SPR * 0.42;
+        const g = c.createRadialGradient(0, 0, 0, 0, 0, r);
+        g.addColorStop(0, color); g.addColorStop(0.7, color + 'AA'); g.addColorStop(1, color + '33');
+        c.fillStyle = g; c.beginPath();
+        if (shape === 0) c.arc(0, 0, r, 0, Math.PI * 2);
+        else if (shape === 1) { for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2, rr = i % 2 ? r * 0.5 : r; i ? c.lineTo(Math.cos(a) * rr, Math.sin(a) * rr) : c.moveTo(Math.cos(a) * rr, Math.sin(a) * rr); } c.closePath(); }
+        else if (shape === 2) { c.moveTo(0, -r); c.lineTo(r, 0); c.lineTo(0, r); c.lineTo(-r, 0); c.closePath(); }
+        else { for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2, px = Math.cos(a) * r * 0.5, py = Math.sin(a) * r * 0.5; c.moveTo(px + r * 0.45, py); c.arc(px, py, r * 0.45, 0, Math.PI * 2); } }
+        c.fill();
+        c.fillStyle = color + '99'; c.beginPath(); c.arc(0, 0, r * 0.3, 0, Math.PI * 2); c.fill();
+        spriteCache.set(key, cv);
+        return cv;
+    }
+    const palette = () => PALETTES[S.palette];
+    const colorOf = (ci) => { const p = palette(); return p[((ci + M.palShift) % p.length + p.length) % p.length]; };
 
-            let mx = pattern.x, my = pattern.y, ms = pattern.size, mr = pattern.rotation;
-            const dist = Math.hypot(mouseX - mx, mouseY - my);
+    // Adaptive quality: if a device struggles, render fewer pixels and fewer depth shapes
+    const Q = { level: 0, dprMax: 1.5, backEvery: 2, pop: 1, ft: 16 };
+    function setQuality(level) {
+        Q.level = level;
+        Q.dprMax = [1.5, 1.15, 1][level]; Q.backEvery = [2, 3, 5][level]; Q.pop = [1, 0.85, 0.65][level];
+        resize();
+    }
+    let W = 0, H = 0, dpr = 1;
+    function resize() {
+        dpr = Math.min(Q.dprMax, window.devicePixelRatio || 1);
+        W = window.innerWidth; H = window.innerHeight;
+        canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+    }
+    addEventListener('resize', resize); resize();
 
-            if (mode === 0) {
-                mx += Math.sin(time * pattern.speed + pattern.phase) * 20 * energy * pattern.morphIntensity;
-                my += Math.cos(time * pattern.speed + pattern.phase) * 15 * energy * pattern.morphIntensity;
-                ms += Math.sin(time * pattern.pulseRate) * 3 * energy;
-                mr += time * pattern.speed * energy;
-            } else if (mode === 1) {
-                const a = Math.atan2(my - sh / 2, mx - sw / 2) + time * 0.01 * energy;
-                const r = Math.hypot(mx - sw / 2, my - sh / 2);
-                mx = sw / 2 + Math.cos(a) * (r + Math.sin(time * 0.02) * 10 * energy);
-                my = sh / 2 + Math.sin(a) * (r + Math.cos(time * 0.02) * 10 * energy);
-                ms += Math.sin(a + time * 0.03) * 4 * energy;
-                mr = a;
-            } else {
-                const f = energy * pattern.morphIntensity * Math.max(0, 1 - dist / 200);
-                if (f > 0) {
-                    const a = Math.atan2(my - mouseY, mx - mouseX);
-                    mx += Math.cos(a) * f * 30;
-                    my += Math.sin(a) * f * 30;
-                    ms += f * 5;
-                    mr += f * 2;
-                }
-            }
-
-            mx = ((mx % sw) + sw) % sw;
-            my = ((my % sh) + sh) % sh;
-            ms = Math.max(1, Math.min(20, ms));
-            drawShape(pattern, mx, my, ms, mr);
-        }
+    function layout() {
+        const open = !document.body.classList.contains('panel-closed');
+        const phone = W <= 720;
+        let cx = W / 2, cy = H / 2, avail = Math.min(W, H);
+        if (open && !phone) { cx = (W - 300) / 2; avail = Math.min(W - 300, H); }
+        if (open && phone) { cy = H * 0.27; avail = Math.min(W, H * 0.52); }
+        return { cx, cy, R: avail * 0.44 * S.size };
     }
 
-    function drawKaleidoscope() {
-        if (settings.trails) {
-            ctx.fillStyle = 'rgba(0,0,0,0.12)';
-        } else {
-            ctx.fillStyle = '#000';
-        }
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        const n = settings.segments;
-        const R = settings.radius * audioSize;
-        const half = R * Math.tan(Math.PI / n) * 1.02; // wedges meet with no gaps
-        const cx = canvas.width / 2, cy = canvas.height / 2;
-
+    function drawSlices(cx, cy, R, n, rot, alpha, every, sizeMul) {
+        const half = R * Math.tan(Math.PI / n) * 1.02;
+        const tw = M.twist;
         for (let i = 0; i < n; i++) {
             ctx.save();
             ctx.translate(cx, cy);
-            ctx.rotate((i / n) * Math.PI * 2 + spinAngle);
-            ctx.beginPath();
-            ctx.moveTo(0, 0);
-            ctx.lineTo(R, -half);
-            ctx.lineTo(R, half);
-            ctx.closePath();
-            ctx.clip();
+            ctx.rotate(i / n * Math.PI * 2 + rot);
+            ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(R * 1.02, -half); ctx.lineTo(R * 1.02, half); ctx.closePath(); ctx.clip();
             if (i % 2 === 1) ctx.scale(1, -1);
-            ctx.translate(-segW() / 2, -segH() / 2);
-            drawKaleidoscopeSegment();
+            for (let j = 0; j < blooms.length; j += every) {
+                const b = blooms[j];
+                const age = M.t - b.born;
+                let a = easeOut(age / b.grow);
+                if (age > b.life) a *= clamp(1 - (age - b.life) / b.fade, 0, 1);
+                if (b.dying) a *= clamp(1 - (M.t - b.dieAt) / b.fade, 0, 1);
+                if (a <= 0.01) continue;
+                const u = b.u + 0.02 * noise1(M.t * 0.2, b.salt) * (0.5 + S.surprise);
+                // bass bulges the inside more than the rim: the structure moves from within
+                const ru = u + M.pulse * u * (1 - Math.min(u, 1)) * 1.6;
+                const x = ru * R;
+                const y = (b.v + tw * 0.35 * Math.sin(u * Math.PI * 2 + M.t * 0.25 + b.salt)) * R * Math.tan(Math.PI / n) * u * 1.1
+                          + 0.012 * R * noise1(M.t * 0.25, b.salt + 3) * (0.5 + S.surprise);
+                const sz = R * 0.032 * b.size * sizeMul * (0.6 + 0.7 * Math.min(u, 1)) * (0.3 + 0.7 * a) * (1 + M.glow * 0.2);
+                ctx.globalAlpha = alpha * a;
+                ctx.save();
+                ctx.translate(x, y); ctx.rotate(b.rot + tw * u);
+                ctx.drawImage(sprite(b.shape, colorOf(b.ci)), -sz, -sz, sz * 2, sz * 2);
+                ctx.restore();
+            }
             ctx.restore();
         }
+        ctx.globalAlpha = 1;
+    }
 
-        const pal = colors();
-        ctx.save();
-        ctx.translate(cx, cy);
-        const centralSize = Math.max(1, (50 + complexity * 30) * growthFactor);
-        const g = ctx.createRadialGradient(0, 0, 0, 0, 0, centralSize);
-        g.addColorStop(0, pal[Math.floor(time * 0.01) % pal.length] + '44');
-        g.addColorStop(1, 'transparent');
-        ctx.fillStyle = g;
-        ctx.beginPath();
-        ctx.arc(0, 0, Math.max(0, centralSize + Math.sin(time * 0.02) * 20 * growthFactor), 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
+    function render() {
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.fillStyle = 'rgba(0,0,0,' + (1 - S.trails).toFixed(3) + ')';
+        ctx.fillRect(0, 0, W, H);
+        const { cx, cy, R: R0 } = layout();
+        const R = R0 * M.scale;
 
-        if (settings.rings) {
-            const ringCount = Math.min(5, 3 + Math.floor(complexity));
-            for (let ring = 0; ring < ringCount; ring++) {
-                ctx.strokeStyle = pal[(ring + Math.floor(time * 0.005)) % pal.length] + '33';
-                ctx.lineWidth = 2 + complexity;
+        if (S.depth) drawSlices(cx, cy, R * 1.5, M.segCur, M.backRot, 0.16, Q.backEvery, 0.7);
+        if (M.segFade < 1) drawSlices(cx, cy, R, M.segPrev, M.rot, 1 - M.segFade, 1, 1);
+        drawSlices(cx, cy, R, M.segCur, M.rot, M.segFade < 1 ? M.segFade : 1, 1, 1);
+
+        const pal = palette();
+        const c0 = pal[Math.floor(M.t * 0.15 + M.palShift) % pal.length];
+        const cs = R * (0.22 + 0.1 * M.pulse + 0.15 * M.glow);
+        const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, cs);
+        g.addColorStop(0, c0 + '66'); g.addColorStop(1, 'transparent');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, cs, 0, Math.PI * 2); ctx.fill();
+
+        if (S.rings) {
+            for (let r = 0; r < 4; r++) {
+                ctx.strokeStyle = pal[(r + Math.floor(M.t * 0.08) + M.palShift) % pal.length] + '33';
+                ctx.lineWidth = 1.5 + M.glow * 2;
                 ctx.beginPath();
-                const base = (120 + ring * 60) * growthFactor * (R / 200);
-                const rr = Math.max(0, base + Math.sin(time * 0.01 + ring) * 30 * energy * growthFactor);
-                ctx.arc(cx, cy, rr, 0, Math.PI * 2);
-                ctx.stroke();
+                const rr = R * (0.38 + r * 0.19) * (1 + M.pulse * (0.6 - r * 0.12)) + 6 * noise1(M.t * 0.3, r);
+                ctx.arc(cx, cy, Math.max(0, rr), 0, Math.PI * 2); ctx.stroke();
             }
         }
     }
 
-    function animate() {
-        updateAudio();
-        drawKaleidoscope();
-
-        if (!paused) {
-            const s = settings.speed * audioSpeed;
-            growthFactor = Math.min(3, Math.max(growthFactor, 0.8 + time * 0.0005)); // starts fuller than the original, so it can dance from the first beat
-            complexity = Math.min(2, time * 0.0003);
-
-            if (frame % 300 === 0 && patterns.length < settings.density + 170 + complexity * 100) {
-                patterns.push(makePattern({
-                    size: Math.random() * (3 + complexity * 2) + 1,
-                    speed: 0.005 + Math.random() * (0.01 + complexity * 0.01),
-                    pulseRate: 0.01 + Math.random() * (0.02 + complexity * 0.01),
-                    morphIntensity: 0.2 + Math.random() * (0.5 + complexity * 0.5)
-                }));
-            }
-
-            for (const p of patterns) {
-                const age = time - p.birthTime;
-                p.speed = Math.min(0.03, p.speed + age * 0.000001 * s);
-                p.morphIntensity = Math.min(2, p.morphIntensity + age * 0.000002 * s);
-                if (p.life !== undefined) {
-                    p.life -= s;
-                }
-            }
-            for (let i = patterns.length - 1; i >= 0; i--) {
-                if (patterns[i].life !== undefined && patterns[i].life <= 0) patterns.splice(i, 1);
-            }
-            if (patterns.length > 300) patterns.splice(0, patterns.length - 200);
-
-            energy = Math.max(0.3, energy * Math.pow(0.99, s));
-            if (settings.spin) spinAngle += 0.002 * s;
-            time += s;
-            frame += 1;
-        }
-        requestAnimationFrame(animate);
+    // =====================================================================
+    // Loop
+    // =====================================================================
+    let paused = false, lastTs = 0;
+    function frame(ts) {
+        const dt = Math.min(0.05, Math.max(0.001, (ts - lastTs) / 1000 || 0.016));
+        lastTs = ts;
+        Q.ft = Q.ft * 0.97 + dt * 1000 * 0.03;
+        if (Q.ft > 36 && Q.level < 2 && M.t > 4) { setQuality(Q.level + 1); Q.ft = 16; }
+        const now = ts / 1000;
+        analyse(dt, now);
+        if (!paused) updateMotion(dt);
+        render();
+        drawMeters();
+        requestAnimationFrame(frame);
     }
 
-    function burst(atX, atY) {
-        energy = Math.min(3, energy + 1);
-        if (atX !== undefined) { mouseX = atX; mouseY = atY; }
-        const count = Math.min(15, 5 + Math.floor(complexity * 5));
-        for (let i = 0; i < count; i++) {
-            patterns.push(makePattern({
-                size: Math.random() * (8 + complexity * 4) + 2,
-                speed: (0.01 + Math.random() * 0.02) * (1 + complexity * 0.5),
-                pulseRate: (0.02 + Math.random() * 0.03) * (1 + complexity * 0.3),
-                morphIntensity: (0.5 + Math.random() * 1.5) * (1 + complexity * 0.4),
-                life: 80 + complexity * 20 // in ~1/10 time units below
-            }));
-            patterns[patterns.length - 1].life *= 10;
-        }
-        growthFactor = Math.min(3, growthFactor + 0.05);
-    }
-
-    function reset() {
-        patterns.length = 0;
-        time = 0; frame = 0; energy = 1; growthFactor = 0.1; complexity = 0; spinAngle = 0;
-        initPatterns();
-    }
-
-    // ---------- Pointer ----------
-    function toCanvas(e) {
-        const r = canvas.getBoundingClientRect();
-        return { x: (e.clientX - r.left) * (canvas.width / r.width), y: (e.clientY - r.top) * (canvas.height / r.height) };
-    }
-    canvas.addEventListener('pointermove', (e) => { const p = toCanvas(e); mouseX = p.x; mouseY = p.y; });
-    canvas.addEventListener('click', (e) => { const p = toCanvas(e); burst(p.x, p.y); });
-
-    // ---------- Panel wiring ----------
-    const $ = (id) => document.getElementById(id);
-
-    function setMode(m) {
-        settings.mode = m;
-        document.querySelectorAll('#modeSeg button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.mode === m)));
-        save();
-    }
-    document.querySelectorAll('#modeSeg button').forEach(b => b.addEventListener('click', () => setMode(+b.dataset.mode)));
-
-    function bindRange(id, key, fmt, onChange) {
-        const input = $(id), out = $(id + 'Out');
-        input.value = settings[key];
-        out.textContent = fmt(settings[key]);
-        input.addEventListener('input', () => {
-            settings[key] = parseFloat(input.value);
-            out.textContent = fmt(settings[key]);
-            if (onChange) onChange();
-            save();
-        });
-    }
-    bindRange('segments', 'segments', v => String(v));
-    bindRange('speed', 'speed', v => v.toFixed(1) + '×');
-    bindRange('radius', 'radius', v => String(v));
-    bindRange('density', 'density', v => String(v), () => {
-        const base = patterns.filter(p => p.life === undefined);
-        if (base.length < settings.density) {
-            for (let i = base.length; i < settings.density; i++) patterns.push(makePattern());
-        } else {
-            let extra = base.length - settings.density;
-            for (let i = patterns.length - 1; i >= 0 && extra > 0; i--) {
-                if (patterns[i].life === undefined) { patterns.splice(i, 1); extra--; }
-            }
-        }
-    });
-
-    const palWrap = $('palettes');
-    Object.entries(PALETTES).forEach(([name, cols], idx) => {
-        const b = document.createElement('button');
-        b.className = 'pal';
-        b.id = 'pal' + idx;
-        b.setAttribute('aria-pressed', String(name === settings.palette));
-        b.innerHTML = '<span class="swatch">' + cols.slice(0, 6).map(c => '<i style="background:' + c + '"></i>').join('') + '</span>' + name;
-        b.addEventListener('click', () => {
-            settings.palette = name;
-            palWrap.querySelectorAll('.pal').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
-            save();
-        });
-        palWrap.appendChild(b);
-    });
-
-    document.querySelectorAll('#shapeChips .chip').forEach(chip => {
-        const i = +chip.dataset.shape;
-        chip.setAttribute('aria-pressed', String(settings.shapes[i]));
-        chip.addEventListener('click', () => {
-            const on = !settings.shapes[i];
-            if (!on && settings.shapes.filter(Boolean).length === 1) return; // keep at least one
-            settings.shapes[i] = on;
-            chip.setAttribute('aria-pressed', String(on));
-            if (on) {
-                // give newly enabled shapes some presence
-                patterns.forEach(p => { if (Math.random() < 0.25) p.shape = i; });
-            }
-            save();
-        });
-    });
-
-    ['trails', 'rings', 'spin'].forEach(key => {
-        const box = $(key);
-        box.checked = settings[key];
-        box.addEventListener('change', () => { settings[key] = box.checked; save(); });
-    });
-
-    const pauseBtn = $('pauseBtn');
-    function togglePause() { paused = !paused; pauseBtn.textContent = paused ? 'Play' : 'Pause'; }
-    pauseBtn.addEventListener('click', togglePause);
-    $('burstBtn').addEventListener('click', () => burst());
-    $('resetBtn').addEventListener('click', reset);
-
-    function setPanel(open) {
-        document.body.classList.toggle('panel-closed', !open);
-        $('openPanel').hidden = open;
-        try { localStorage.setItem('kaleido-panel', open ? '1' : '0'); } catch (e) {}
-    }
-    $('closePanel').addEventListener('click', () => setPanel(false));
-    $('openPanel').addEventListener('click', () => setPanel(true));
-    try { if (localStorage.getItem('kaleido-panel') === '0') setPanel(false); } catch (e) {}
-
-    document.addEventListener('keydown', (e) => {
-        const t = e.target;
-        const typing = t && (t.tagName === 'INPUT' || t.tagName === 'BUTTON' || t.tagName === 'TEXTAREA');
-        if (e.code === 'Space' && !typing) { setMode((settings.mode + 1) % 3); e.preventDefault(); }
-        else if (e.key === 'p' || e.key === 'P') togglePause();
-        else if (e.key === 'h' || e.key === 'H') setPanel(document.body.classList.contains('panel-closed'));
-    });
-
-
-    // ---------- Sound ----------
-    // The analyser listens to the microphone or a loaded track and turns bass, mids and highs into movement.
-    let audioSize = 1, audioSpeed = 1;
-    const audio = { sens: 1, pulse: true, beats: true, sparkle: true, spin: true, drops: false };
-    try { const a = JSON.parse(localStorage.getItem('kaleido-audio') || 'null'); if (a && typeof a === 'object') Object.assign(audio, a); } catch (e) {}
-    const saveAudio = () => { try { localStorage.setItem('kaleido-audio', JSON.stringify(audio)); } catch (e) {} };
-
-    let actx = null, analyser = null, freq = null;
-    let micStream = null, micNode = null, trackEl = null, trackNode = null, trackURL = null;
-    const bands = { bass: 0, mid: 0, high: 0 };
-    let bassAvg = 0, lastBeat = 0, lastDrop = 0;
-
-    function soundMsg(text, err) { const m = $('soundMsg'); m.textContent = text; m.classList.toggle('error', !!err); }
-
-    function ensureContext() {
-        if (!actx) {
+    // =====================================================================
+    // Sound sources
+    // =====================================================================
+    const msg = (t, err) => { const m = $('soundMsg'); m.textContent = t; m.classList.toggle('error', !!err); };
+    function ensureCtx() {
+        if (!A.ctx) {
             const AC = window.AudioContext || window.webkitAudioContext;
             if (!AC) throw new Error('no-audio');
-            actx = new AC();
-            analyser = actx.createAnalyser();
-            analyser.fftSize = 2048;
-            analyser.smoothingTimeConstant = 0.6;
-            freq = new Uint8Array(analyser.frequencyBinCount);
+            A.ctx = new AC();
+            A.analyser = A.ctx.createAnalyser();
+            A.analyser.fftSize = 2048; A.analyser.smoothingTimeConstant = 0.35;
+            A.freq = new Uint8Array(A.analyser.frequencyBinCount);
+            A.prev = new Uint8Array(A.analyser.frequencyBinCount);
+            A.wave = new Uint8Array(A.analyser.fftSize);
         }
-        if (actx.state === 'suspended') actx.resume();
+        if (A.ctx.state === 'suspended') A.ctx.resume();
     }
-
     function stopMic() {
-        if (micNode) { try { micNode.disconnect(); } catch (e) {} micNode = null; }
-        if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
-        $('micBtn').setAttribute('aria-pressed', 'false');
-        $('micBtn').textContent = 'Microphone';
+        if (A.micNode) { try { A.micNode.disconnect(); } catch (e) {} A.micNode = null; }
+        if (A.mic) { A.mic.getTracks().forEach(t => t.stop()); A.mic = null; }
+        $('micBtn').setAttribute('aria-pressed', 'false'); $('micBtn').textContent = 'Microphone';
     }
     function stopTrack() {
-        if (trackEl) { trackEl.pause(); }
-        if (trackNode) { try { trackNode.disconnect(); } catch (e) {} trackNode = null; }
-        if (trackURL) { URL.revokeObjectURL(trackURL); trackURL = null; }
-        trackEl = null;
-        $('trackRow').hidden = true; $('progress').hidden = true;
+        if (A.el) A.el.pause();
+        if (A.elNode) { try { A.elNode.disconnect(); } catch (e) {} A.elNode = null; }
+        if (A.url) { URL.revokeObjectURL(A.url); A.url = null; }
+        A.el = null; $('trackRow').hidden = true; $('progress').hidden = true;
     }
-
     $('micBtn').addEventListener('click', async () => {
-        if (micStream) { stopMic(); soundMsg('Microphone off.'); return; }
+        if (A.mic) { stopMic(); msg('Microphone off. It breathes on its own again.'); return; }
         stopTrack();
         try {
-            ensureContext();
+            ensureCtx();
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw { name: 'NotSupported' };
-            micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
-            try { analyser.disconnect(); } catch (e) {}
-            micNode = actx.createMediaStreamSource(micStream);
-            micNode.connect(analyser); // not to the speakers, so there is no feedback
-            $('micBtn').setAttribute('aria-pressed', 'true');
-            $('micBtn').textContent = 'Mic on · stop';
-            soundMsg('Listening. Play some music in the room.');
+            A.mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+            try { A.analyser.disconnect(); } catch (e) {}
+            A.micNode = A.ctx.createMediaStreamSource(A.mic);
+            A.micNode.connect(A.analyser);       // not to the speakers: no feedback
+            $('micBtn').setAttribute('aria-pressed', 'true'); $('micBtn').textContent = 'Mic on · stop';
+            msg('Listening. Give it a few beats to find the tempo.');
         } catch (err) {
             stopMic();
-            const name = err && err.name;
-            if (name === 'NotAllowedError' || name === 'SecurityError') {
-                soundMsg('The microphone was blocked. Allow it in your browser (the icon next to the address), or load a track instead. Inside a Claude preview the microphone is not available; it works on the live site.', true);
-            } else if (name === 'NotFoundError') {
-                soundMsg('No microphone found on this device. Load a track instead.', true);
-            } else {
-                soundMsg('The microphone could not start here. Load a track instead.', true);
-            }
+            const n = err && err.name;
+            if (n === 'NotAllowedError' || n === 'SecurityError') msg('The microphone was blocked. Allow it via the icon next to the address, or load a track. Inside a Claude preview the microphone is not available; it works on the live site.', true);
+            else if (n === 'NotFoundError') msg('No microphone found on this device. Load a track instead.', true);
+            else msg('The microphone could not start here. Load a track instead.', true);
         }
     });
-
     $('trackInput').addEventListener('change', () => {
         const file = $('trackInput').files && $('trackInput').files[0];
         if (!file) return;
         stopMic(); stopTrack();
-        try { ensureContext(); } catch (e) { soundMsg('This browser cannot analyse audio.', true); return; }
-        trackURL = URL.createObjectURL(file);
-        trackEl = new Audio();
-        trackEl.src = trackURL;
-        trackEl.crossOrigin = 'anonymous';
-        trackNode = actx.createMediaElementSource(trackEl);
-        trackNode.connect(analyser);
-        try { analyser.disconnect(); } catch (e) {}
-        analyser.connect(actx.destination);
+        try { ensureCtx(); } catch (e) { msg('This browser cannot analyse audio.', true); return; }
+        A.url = URL.createObjectURL(file);
+        A.el = new Audio(); A.el.src = A.url;
+        A.elNode = A.ctx.createMediaElementSource(A.el);
+        try { A.analyser.disconnect(); } catch (e) {}
+        A.elNode.connect(A.analyser); A.analyser.connect(A.ctx.destination);
         $('trackName').textContent = file.name.replace(/\.[^.]+$/, '');
         $('trackRow').hidden = false; $('progress').hidden = false;
-        trackEl.play().then(() => { $('playBtn').textContent = 'Pause'; soundMsg('Playing. Turn it up!'); })
-            .catch(() => { $('playBtn').textContent = 'Play'; soundMsg('Press Play to start the track.'); });
-        trackEl.addEventListener('ended', () => { $('playBtn').textContent = 'Play again'; soundMsg('Track finished.'); });
+        A.el.play().then(() => { $('playBtn').textContent = 'Pause'; msg('Playing. Give it a few beats to find the tempo.'); })
+            .catch(() => { $('playBtn').textContent = 'Play'; msg('Press Play to start the track.'); });
+        A.el.addEventListener('ended', () => { $('playBtn').textContent = 'Play again'; msg('Track finished.'); });
         $('trackInput').value = '';
     });
     $('playBtn').addEventListener('click', () => {
-        if (!trackEl) return;
-        ensureContext();
-        if (trackEl.paused) { trackEl.play().catch(() => {}); $('playBtn').textContent = 'Pause'; }
-        else { trackEl.pause(); $('playBtn').textContent = 'Play'; }
+        if (!A.el) return; ensureCtx();
+        if (A.el.paused) { A.el.play().catch(() => {}); $('playBtn').textContent = 'Pause'; }
+        else { A.el.pause(); $('playBtn').textContent = 'Play'; }
     });
     $('progress').addEventListener('click', (e) => {
-        if (!trackEl || !trackEl.duration) return;
+        if (!A.el || !A.el.duration) return;
         const r = $('progress').getBoundingClientRect();
-        trackEl.currentTime = ((e.clientX - r.left) / r.width) * trackEl.duration;
+        A.el.currentTime = ((e.clientX - r.left) / r.width) * A.el.duration;
     });
 
-    function sparkle() {
-        patterns.push(makePattern({
-            size: 1 + Math.random() * 3,
-            speed: 0.02 + Math.random() * 0.02,
-            morphIntensity: 1 + Math.random(),
-            life: 120 + Math.random() * 120
-        }));
-    }
-    function beatBurst(strength) {
-        energy = Math.min(3, energy + 0.8 * strength);
-        growthFactor = Math.min(3, growthFactor + 0.015);
-        for (let i = 0; i < 4; i++) {
-            patterns.push(makePattern({
-                size: Math.random() * (6 + complexity * 3) + 2,
-                speed: 0.01 + Math.random() * 0.02,
-                morphIntensity: 0.6 + Math.random() * 1.2,
-                life: 260 + Math.random() * 140
-            }));
-        }
-    }
-
-    function band(lo, hi) {
-        const hz = actx.sampleRate / 2 / freq.length;
-        const a = Math.max(1, Math.floor(lo / hz)), b = Math.min(freq.length - 1, Math.ceil(hi / hz));
-        let sum = 0; for (let i = a; i <= b; i++) sum += freq[i];
-        return sum / ((b - a + 1) * 255);
-    }
-
-    function updateAudio() {
-        audioSize = 1; audioSpeed = 1;
-        const live = analyser && (micStream || (trackEl && !trackEl.paused));
-        if (!live) { bands.bass *= 0.9; bands.mid *= 0.9; bands.high *= 0.9; drawMeters(); return; }
-        analyser.getByteFrequencyData(freq);
-        const rawBass = band(25, 150), rawMid = band(150, 2000), rawHigh = band(2000, 11000);
-        bands.bass += (rawBass - bands.bass) * 0.35;
-        bands.mid += (rawMid - bands.mid) * 0.2;
-        bands.high += (rawHigh - bands.high) * 0.25;
-        bassAvg = bassAvg * 0.96 + rawBass * 0.04;
-        const k = audio.sens;
-
-        if (audio.pulse) {
-            energy = Math.max(energy, 0.3 + bands.bass * 2.4 * k);
-            audioSize = 1 + Math.min(0.45, bands.bass * 0.3 * k);
-        }
-        if (audio.spin) audioSpeed = 1 + Math.min(3, bands.mid * 2.2 * k);
-        if (audio.sparkle && Math.random() < Math.min(0.8, bands.high * 1.6 * k)) sparkle();
-        if (settings.spin && audio.spin) spinAngle += bands.mid * 0.01 * k;
-
-        const now = performance.now();
-        const isBeat = rawBass * k > 0.25 && rawBass > bassAvg * 1.25 + 0.03 && now - lastBeat > 260;
-        if (isBeat) {
-            lastBeat = now;
-            if (audio.beats) beatBurst(Math.min(1.5, rawBass * k));
-            if (audio.drops && rawBass > bassAvg * 1.6 && rawBass * k > 0.7 && now - lastDrop > 8000) {
-                lastDrop = now;
-                setMode((settings.mode + 1) % 3);
-                energy = 3;
-            }
-        }
-        if (trackEl && trackEl.duration) $('progressBar').style.width = (100 * trackEl.currentTime / trackEl.duration) + '%';
-        drawMeters();
-    }
+    const SECTION_NAMES = { calm: 'calm', breakdown: 'breakdown', building: 'building up', drop: 'drop', groove: 'groove' };
+    let meterTick = 0;
     function drawMeters() {
-        $('mBass').style.height = Math.min(100, bands.bass * 140) + '%';
-        $('mMid').style.height = Math.min(100, bands.mid * 160) + '%';
-        $('mHigh').style.height = Math.min(100, bands.high * 220) + '%';
+        $('mBass').style.height = Math.min(100, F.bass * 150) + '%';
+        $('mKick').style.height = Math.min(100, F.kick * 90) + '%';
+        $('mPerc').style.height = Math.min(100, F.perc * 90) + '%';
+        $('mBright').style.height = Math.min(100, F.bright * 100) + '%';
+        if (A.el && A.el.duration) $('progressBar').style.width = (100 * A.el.currentTime / A.el.duration) + '%';
+        if (++meterTick % 15 === 0) {
+            $('bpmOut').textContent = F.active && F.beatConf > 0.35 ? F.bpm + ' BPM' : '– BPM';
+            $('sectionOut').textContent = F.active ? SECTION_NAMES[F.section] : 'breathing on its own';
+        }
     }
 
-    $('sens').value = audio.sens; $('sensOut').textContent = Number(audio.sens).toFixed(1) + '×';
-    $('sens').addEventListener('input', () => { audio.sens = parseFloat($('sens').value); $('sensOut').textContent = audio.sens.toFixed(1) + '×'; saveAudio(); });
-    [['aPulse', 'pulse'], ['aBeats', 'beats'], ['aSparkle', 'sparkle'], ['aSpin', 'spin'], ['aDrops', 'drops']].forEach(([id, key]) => {
-        $(id).checked = !!audio[key];
-        $(id).addEventListener('change', () => { audio[key] = $(id).checked; saveAudio(); });
+    // =====================================================================
+    // Controls
+    // =====================================================================
+    const fmt = {
+        surprise: v => Math.round(v * 100) + '%', intensity: v => v.toFixed(2) + '×', bloom: v => v.toFixed(2) + '×',
+        bassSens: v => v.toFixed(2) + '×', percSens: v => v.toFixed(2) + '×', rotation: v => v.toFixed(2) + '×',
+        distortion: v => Math.round(v * 100) + '%', smooth: v => Math.round(v * 100) + '%', trails: v => Math.round(v * 100) + '%',
+        size: v => v.toFixed(2) + '×', mirrors: v => String(v)
+    };
+    Object.keys(fmt).forEach(key => {
+        const el = $(key), out = $(key + 'Out');
+        el.value = S[key]; out.textContent = fmt[key](Number(S[key]));
+        el.addEventListener('input', () => {
+            S[key] = key === 'mirrors' ? parseInt(el.value, 10) : parseFloat(el.value);
+            out.textContent = fmt[key](S[key]);
+            if (key === 'mirrors') { M.segPrev = M.segCur; M.segCur = S.mirrors; M.segFade = 0; }
+            save();
+        });
     });
+    ['symmetry', 'rings', 'depth'].forEach(key => {
+        $(key).checked = !!S[key];
+        $(key).addEventListener('change', () => { S[key] = $(key).checked; save(); });
+    });
+    const palWrap = $('palettes');
+    Object.entries(PALETTES).forEach(([name, cols], idx) => {
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'pal'; b.id = 'pal' + idx;
+        b.setAttribute('aria-pressed', String(name === S.palette));
+        const sw = document.createElement('span'); sw.className = 'swatch';
+        cols.slice(0, 6).forEach(c => { const i = document.createElement('i'); i.style.background = c; sw.appendChild(i); });
+        b.append(sw, name);
+        b.addEventListener('click', () => { S.palette = name; palWrap.querySelectorAll('.pal').forEach(x => x.setAttribute('aria-pressed', String(x === b))); save(); });
+        palWrap.appendChild(b);
+    });
+    document.querySelectorAll('#shapeChips .chip').forEach(chip => {
+        const i = +chip.dataset.shape;
+        chip.setAttribute('aria-pressed', String(S.shapes[i]));
+        chip.addEventListener('click', () => {
+            const on = !S.shapes[i];
+            if (!on && S.shapes.filter(Boolean).length === 1) return;
+            S.shapes[i] = on; chip.setAttribute('aria-pressed', String(on));
+            if (!on) blooms.forEach(b => { if (b.shape === i && !b.dying) { b.dying = true; b.dieAt = M.t; } });
+            save();
+        });
+    });
+
+    function manualBloom() { F.dropEvent = 0; M.dropBloom = Math.min(1.4, M.dropBloom + 0.35 * S.bloom); M.pulseV += 1.2; M.palShift += 2; for (let i = 0; i < 14; i++) addBloom({ u: 0.04 + rnd() * 0.2, size: 1 + rnd(), grow: 2 + rnd() * 1.5 }); }
+    function newVariation() {
+        S.seed = (S.seed * 7 + 13) % 100003; reseed(S.seed); save();
+        M.dir *= -1; M.palShift += 5; M.segPrev = M.segCur; M.segCur = clamp(S.mirrors + [-2, 0, 2, 4][Math.floor(rnd() * 4)], 6, 20); M.segFade = 0;
+        blooms.forEach(b => { if (!b.dying && rnd() < 0.6) { b.dying = true; b.dieAt = M.t; } });
+    }
+    $('bloomBtn').addEventListener('click', manualBloom);
+    $('variationBtn').addEventListener('click', newVariation);
+    canvas.addEventListener('click', manualBloom);
+    $('pauseBtn').addEventListener('click', () => { paused = !paused; $('pauseBtn').textContent = paused ? 'Play' : 'Pause'; });
 
     function toggleFullscreen() {
-        const d = document;
-        if (d.fullscreenElement) { d.exitFullscreen().catch(() => {}); return; }
-        const el = d.documentElement;
-        const req = el.requestFullscreen || el.webkitRequestFullscreen;
-        if (!req) { soundMsg('Fullscreen is not available here. Press H to hide the panel instead.', true); return; }
-        Promise.resolve(req.call(el)).catch(() => soundMsg('Fullscreen is not available here. Press H to hide the panel instead.', true));
+        if (document.fullscreenElement) { document.exitFullscreen().catch(() => {}); return; }
+        const el = document.documentElement, req = el.requestFullscreen || el.webkitRequestFullscreen;
+        if (!req) { msg('Fullscreen is not available here. Press H to hide the panel instead.', true); return; }
+        Promise.resolve(req.call(el)).catch(() => msg('Fullscreen is not available here. Press H to hide the panel instead.', true));
     }
     $('fsBtn').addEventListener('click', toggleFullscreen);
+    document.addEventListener('fullscreenchange', () => { $('fsBtn').textContent = document.fullscreenElement ? 'Exit' : 'Full'; });
+    function setPanel(open) { document.body.classList.toggle('panel-closed', !open); $('openPanel').hidden = open; }
+    $('closePanel').addEventListener('click', () => setPanel(false));
+    $('openPanel').addEventListener('click', () => setPanel(true));
     document.addEventListener('keydown', (e) => {
         const t = e.target;
         if (t && (t.tagName === 'INPUT' || t.tagName === 'BUTTON' || t.tagName === 'TEXTAREA')) return;
-        if (e.key === 'f' || e.key === 'F') toggleFullscreen();
+        const k = e.key.toLowerCase();
+        if (k === 'f') toggleFullscreen();
+        else if (k === 'h') setPanel(document.body.classList.contains('panel-closed'));
+        else if (k === 'n') newVariation();
+        else if (k === 'p') $('pauseBtn').click();
+        else if (k === 'b' || e.code === 'Space') { manualBloom(); e.preventDefault(); }
     });
-    document.addEventListener('fullscreenchange', () => { $('fsBtn').textContent = document.fullscreenElement ? 'Exit fullscreen' : 'Fullscreen'; });
 
-    setMode(settings.mode);
-    initPatterns();
-    animate();
+    // Debug view for testing (read-only)
+    window.__kaleido = { F, M, blooms };
+
+    for (let i = 0; i < 34; i++) addBloom({ born: -rnd() * 3 });
+    requestAnimationFrame(frame);
+})();
 </script>
 </body>
 </html>
